@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: telegram-music-bot
+    env: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: API_ID
+        sync: false
+      - key: API_HASH
+        sync: false
+      - key: BOT_TOKEN
+        sync: false
+      - key: MONGO_URL
+        sync: false
+      - key: ADMIN_ID
+        sync: false
+      - key: SESSION_STRING
+        sync: false
+      - key: ASSISTANT_ID
+        sync: false
+    healthCheckPath: /health
+    autoDeploy: true
