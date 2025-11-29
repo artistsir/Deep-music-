@@ -1,22 +1,37 @@
-# 🎵 Advanced Telegram Music Bot
+# Social Media Downloader API
 
-A feature-rich Telegram Voice Chat Music Bot built with Pyrogram and PyTgCalls, ready for deployment on Render.
+A complete API to download media from Instagram, Twitter, YouTube, and Facebook. Deployable on Render's free tier.
 
-## 🚀 Features
+## Features
 
-- ✅ Voice Chat Music Streaming
-- ✅ YouTube Support
-- ✅ Playlists Management
-- ✅ Queue System
-- ✅ Admin Controls
-- ✅ MongoDB Database
-- ✅ Docker Support
-- ✅ 24/7 Render Deployment
-- ✅ Health Checks
+- 📷 Instagram Reels/Posts download
+- 🐦 Twitter video download  
+- 📺 YouTube video download (multiple qualities)
+- 👥 Facebook video download
+- 🎯 Simple REST API
+- 🌐 Web interface
+- 🚀 Easy deployment
 
-## 🛠 Setup
+## Deployment on Render
 
-### 1. Clone Repository
-```bash
-git clone https://github.com/yourusername/music-bot.git
-cd music-bot
+1. Fork this repository
+2. Go to [Render.com](https://render.com)
+3. Click "New +" → "Web Service"
+4. Connect your GitHub repository
+5. Use these settings:
+   - **Name**: social-media-downloader
+   - **Environment**: Python
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `gunicorn app:app`
+6. Click "Create Web Service"
+
+## API Usage
+
+### Download Media
+```http
+POST /api/download
+Content-Type: application/json
+
+{
+    "url": "https://www.instagram.com/p/Cexample/"
+}
