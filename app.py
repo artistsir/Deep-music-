@@ -6,8 +6,7 @@ import os
 import uuid
 import time
 import threading
-from utils.downloader import download_reel_advanced
-from utils.proxies import get_random_proxy
+from utils.downloader import download_reel_smart
 import logging
 
 # Configure logging
@@ -21,7 +20,7 @@ CORS(app)
 limiter = Limiter(
     get_remote_address,
     app=app,
-    default_limits=["100 per day", "10 per hour"],
+    default_limits=["200 per day", "50 per hour"],
     storage_uri="memory://",
 )
 
@@ -46,18 +45,11 @@ def status():
     })
 
 @app.route('/api/download', methods=['POST'])
-@limiter.limit("5 per minute")
+@limiter.limit("10 per minute")
 def download_reel_endpoint():
     start_time = time.time()
     
     try:
-        # Check content type
-        if not request.is_json:
-            return jsonify({
-                "success": False,
-                "error": "Content-Type must be application/json"
-            }), 400
-        
         data = request.get_json()
         
         if not data or 'url' not in data:
@@ -96,11 +88,8 @@ def download_reel_endpoint():
         
         logger.info(f"Download request for: {reel_url}")
         
-        # Get proxy if available
-        proxy = get_random_proxy() if data.get('use_proxy', False) else None
-        
-        # Download the reel with advanced method
-        result = download_reel_advanced(reel_url, DOWNLOAD_FOLDER, proxy)
+        # Download the reel with smart method
+        result = download_reel_smart(reel_url, DOWNLOAD_FOLDER)
         
         processing_time = round(time.time() - start_time, 2)
         
@@ -111,11 +100,12 @@ def download_reel_endpoint():
                 "download_url": f"/api/file/{result['filename']}",
                 "filename": result['filename'],
                 "file_size": result.get('file_size', 0),
+                "title": result.get('title', 'reel'),
                 "duration": result.get('duration', 'Unknown'),
                 "processing_time": f"{processing_time}s"
             }
             
-            # Add preview info if available
+            # Add thumbnail if available
             if result.get('thumbnail'):
                 response_data['thumbnail'] = result['thumbnail']
             
@@ -152,23 +142,11 @@ def serve_file(filename):
             os.remove(file_path)
             return jsonify({"error": "File expired"}), 410
             
-        return send_file(file_path, as_attachment=True, download_name=f"reel_{filename}")
+        return send_file(file_path, as_attachment=True, download_name=filename)
         
     except Exception as e:
         logger.error(f"File serving error: {str(e)}")
         return jsonify({"error": "Error serving file"}), 500
-
-@app.route('/api/cleanup', methods=['POST'])
-def cleanup_files():
-    """Manual cleanup endpoint"""
-    try:
-        deleted_files = cleanup_old_files()
-        return jsonify({
-            "success": True,
-            "message": f"Cleanup completed. Deleted {deleted_files} files."
-        })
-    except Exception as e:
-        return jsonify({"error": f"Cleanup failed: {str(e)}"}), 500
 
 def cleanup_old_files():
     """Clean up old files"""
@@ -210,22 +188,8 @@ cleanup_thread.start()
 def ratelimit_handler(e):
     return jsonify({
         "success": False,
-        "error": "Rate limit exceeded. Please try again later."
+        "error": "Rate limit exceeded. Please try again in a few minutes."
     }), 429
-
-@app.errorhandler(404)
-def not_found_handler(e):
-    return jsonify({
-        "success": False,
-        "error": "Endpoint not found"
-    }), 404
-
-@app.errorhandler(500)
-def internal_error_handler(e):
-    return jsonify({
-        "success": False,
-        "error": "Internal server error"
-    }), 500
 
 if __name__ == '__main__':
     logger.info("Starting Reels Downloader API...")
