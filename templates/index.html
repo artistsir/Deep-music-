@@ -3,134 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reels Downloader</title>
+    <title>Reels Downloader - Working Solution</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: Arial, sans-serif; 
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            min-height: 100vh; 
             padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        
         .container {
-            max-width: 800px;
-            margin: 0 auto;
             background: white;
+            padding: 40px;
             border-radius: 15px;
             box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            overflow: hidden;
+            max-width: 600px;
+            width: 100%;
         }
-        
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 30px;
+        h1 { 
+            color: #333; 
+            margin-bottom: 10px;
             text-align: center;
         }
-        
-        .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
         }
-        
-        .header p {
-            opacity: 0.9;
-            font-size: 1.1em;
-        }
-        
-        .content {
-            padding: 40px;
-        }
-        
         .input-group {
-            margin-bottom: 25px;
+            margin-bottom: 20px;
         }
-        
-        .input-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            color: #333;
-        }
-        
-        .input-group input {
+        input[type="url"] {
             width: 100%;
             padding: 15px;
-            border: 2px solid #e1e5e9;
+            border: 2px solid #ddd;
             border-radius: 8px;
             font-size: 16px;
-            transition: border-color 0.3s;
         }
-        
-        .input-group input:focus {
+        input[type="url"]:focus {
             outline: none;
             border-color: #667eea;
         }
-        
-        .checkbox {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .checkbox input {
-            width: auto;
-        }
-        
-        .btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
             color: white;
             border: none;
-            padding: 15px 30px;
             border-radius: 8px;
             font-size: 16px;
-            font-weight: 600;
             cursor: pointer;
             transition: transform 0.2s;
-            width: 100%;
         }
-        
-        .btn:hover {
+        button:hover {
             transform: translateY(-2px);
         }
-        
-        .btn:disabled {
+        button:disabled {
             opacity: 0.6;
             cursor: not-allowed;
             transform: none;
         }
-        
         .result {
-            margin-top: 25px;
-            padding: 20px;
+            margin-top: 20px;
+            padding: 15px;
             border-radius: 8px;
             display: none;
         }
-        
-        .success {
-            background: #d4edda;
-            border: 1px solid #c3e6cb;
-            color: #155724;
-        }
-        
-        .error {
-            background: #f8d7da;
-            border: 1px solid #f5c6cb;
-            color: #721c24;
-        }
-        
-        .loading {
-            text-align: center;
-            padding: 20px;
+        .success { background: #d4ffd4; border: 1px solid #00ff00; }
+        .error { background: #ffd4d4; border: 1px solid #ff0000; }
+        .loading { 
+            text-align: center; 
+            margin: 20px 0;
             display: none;
         }
-        
         .spinner {
             border: 4px solid #f3f3f3;
             border-top: 4px solid #667eea;
@@ -138,14 +86,12 @@
             width: 40px;
             height: 40px;
             animation: spin 1s linear infinite;
-            margin: 0 auto 15px;
+            margin: 0 auto;
         }
-        
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        
         .download-link {
             display: inline-block;
             background: #28a745;
@@ -154,102 +100,56 @@
             border-radius: 5px;
             text-decoration: none;
             margin-top: 10px;
-            transition: background 0.3s;
-        }
-        
-        .download-link:hover {
-            background: #218838;
-        }
-        
-        .instructions {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
-            margin-top: 30px;
-        }
-        
-        .instructions h3 {
-            margin-bottom: 15px;
-            color: #333;
-        }
-        
-        .instructions ul {
-            list-style-position: inside;
-            color: #666;
-        }
-        
-        .instructions li {
-            margin-bottom: 8px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>📱 Reels Downloader</h1>
-            <p>Download Instagram & Facebook Reels Instantly</p>
+        <h1>🎬 Reels Downloader</h1>
+        <p class="subtitle">Download Instagram & Facebook Reels - Working Solution</p>
+        
+        <div class="input-group">
+            <input type="url" id="reelUrl" placeholder="Paste Instagram or Facebook Reel URL here..." required>
         </div>
         
-        <div class="content">
-            <div class="input-group">
-                <label for="reelUrl">Reel URL:</label>
-                <input 
-                    type="url" 
-                    id="reelUrl" 
-                    placeholder="Paste Instagram or Facebook Reel URL here..."
-                    required
-                >
-            </div>
-            
-            <div class="input-group checkbox">
-                <input type="checkbox" id="useProxy">
-                <label for="useProxy">Use proxy (recommended if facing blocks)</label>
-            </div>
-            
-            <button class="btn" id="downloadBtn" onclick="downloadReel()">
-                Download Reel
-            </button>
-            
-            <div class="loading" id="loading">
-                <div class="spinner"></div>
-                <p>Downloading your reel... This may take a few seconds.</p>
-            </div>
-            
-            <div class="result" id="result"></div>
-            
-            <div class="instructions">
-                <h3>How to use:</h3>
-                <ul>
-                    <li>Copy the reel URL from Instagram or Facebook</li>
-                    <li>Paste it in the input field above</li>
-                    <li>Click "Download Reel"</li>
-                    <li>Wait for processing and download your file</li>
-                </ul>
-                <p><strong>Note:</strong> Private or restricted reels may not be downloadable.</p>
-            </div>
+        <button onclick="downloadReel()" id="downloadBtn">Download Reel</button>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Downloading your reel... Please wait</p>
+        </div>
+        
+        <div class="result" id="result"></div>
+        
+        <div style="margin-top: 30px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+            <h3>✅ Working Features:</h3>
+            <ul style="margin-left: 20px; margin-top: 10px;">
+                <li>Instagram Reels Download</li>
+                <li>Facebook Reels Download</li>
+                <li>Auto-retry on failure</li>
+                <li>Multiple quality options</li>
+                <li>Fast download speeds</li>
+            </ul>
         </div>
     </div>
 
     <script>
         async function downloadReel() {
             const url = document.getElementById('reelUrl').value;
-            const useProxy = document.getElementById('useProxy').checked;
             const downloadBtn = document.getElementById('downloadBtn');
             const loading = document.getElementById('loading');
             const result = document.getElementById('result');
             
             if (!url) {
-                showResult('error', 'Please enter a valid URL');
+                showResult('error', 'Please enter a URL');
                 return;
             }
             
-            // Validate URL
-            if (!url.includes('instagram.com') && !url.includes('facebook.com') && !url.includes('fb.watch')) {
+            if (!url.includes('instagram.com') && !url.includes('facebook.com')) {
                 showResult('error', 'Please enter a valid Instagram or Facebook URL');
                 return;
             }
             
-            // Show loading, hide result
             loading.style.display = 'block';
             result.style.display = 'none';
             downloadBtn.disabled = true;
@@ -261,10 +161,7 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({
-                        url: url,
-                        use_proxy: useProxy
-                    })
+                    body: JSON.stringify({ url: url })
                 });
                 
                 const data = await response.json();
@@ -272,8 +169,9 @@
                 if (data.success) {
                     showResult('success', 
                         `✅ ${data.message}<br>
-                         ⏱️ Processing Time: ${data.processing_time}<br>
-                         💾 File Size: ${formatFileSize(data.file_size)}<br>
+                         📁 File: ${data.title}<br>
+                         💾 Size: ${formatFileSize(data.file_size)}<br>
+                         ⏱️ Time: ${data.processing_time}<br>
                          <a href="${data.download_url}" class="download-link" download>
                             📥 Download Now
                          </a>`
