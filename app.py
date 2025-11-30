@@ -7,7 +7,7 @@ import uuid
 import time
 import threading
 import logging
-from utils.downloader import download_reel
+from utils.downloader import download_reel_with_cookies
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -20,17 +20,19 @@ CORS(app)
 limiter = Limiter(
     get_remote_address,
     app=app,
-    default_limits=["500 per day", "100 per hour"],
+    default_limits=["1000 per day", "200 per hour"],
     storage_uri="memory://",
 )
 
 # Configuration
 DOWNLOAD_FOLDER = 'downloads'
+COOKIES_FOLDER = 'cookies'
 MAX_FILE_AGE = 1800  # 30 minutes
-CLEANUP_INTERVAL = 300  # 5 minutes
 
 if not os.path.exists(DOWNLOAD_FOLDER):
     os.makedirs(DOWNLOAD_FOLDER)
+if not os.path.exists(COOKIES_FOLDER):
+    os.makedirs(COOKIES_FOLDER)
 
 @app.route('/')
 def home():
@@ -40,12 +42,12 @@ def home():
 def status():
     return jsonify({
         "status": "active", 
-        "message": "Reels Downloader API is running",
+        "message": "Reels Downloader with Cookie Support",
         "timestamp": time.time()
     })
 
 @app.route('/api/download', methods=['POST'])
-@limiter.limit("20 per minute")
+@limiter.limit("30 per minute")
 def download_reel_endpoint():
     start_time = time.time()
     
@@ -66,21 +68,14 @@ def download_reel_endpoint():
                 "error": "URL cannot be empty"
             }), 400
         
-        # Validate URL format
+        # Validate URL
         if not (reel_url.startswith('http://') or reel_url.startswith('https://')):
             return jsonify({
                 "success": False,
-                "error": "Invalid URL format. Must start with http:// or https://"
+                "error": "Invalid URL format"
             }), 400
         
-        # Check if it's a supported platform
-        supported_domains = [
-            'instagram.com', 'www.instagram.com',
-            'facebook.com', 'www.facebook.com',
-            'fb.watch', 'www.fb.watch'
-        ]
-        
-        if not any(domain in reel_url for domain in supported_domains):
+        if not any(domain in reel_url for domain in ['instagram.com', 'facebook.com', 'fb.watch']):
             return jsonify({
                 "success": False,
                 "error": "Unsupported platform. Supported: Instagram, Facebook"
@@ -88,8 +83,8 @@ def download_reel_endpoint():
         
         logger.info(f"Download request for: {reel_url}")
         
-        # Download the reel
-        result = download_reel(reel_url, DOWNLOAD_FOLDER)
+        # Use cookies for download
+        result = download_reel_with_cookies(reel_url, DOWNLOAD_FOLDER, COOKIES_FOLDER)
         
         processing_time = round(time.time() - start_time, 2)
         
@@ -102,7 +97,8 @@ def download_reel_endpoint():
                 "file_size": result.get('file_size', 0),
                 "title": result.get('title', 'reel'),
                 "duration": result.get('duration', 'Unknown'),
-                "processing_time": f"{processing_time}s"
+                "processing_time": f"{processing_time}s",
+                "quality": result.get('quality', 'HD')
             }
             
             if result.get('thumbnail'):
@@ -113,7 +109,8 @@ def download_reel_endpoint():
             return jsonify({
                 "success": False,
                 "error": result['error'],
-                "processing_time": f"{processing_time}s"
+                "processing_time": f"{processing_time}s",
+                "solution": result.get('solution', 'Try another reel or use cookies')
             }), 500
             
     except Exception as e:
@@ -126,16 +123,14 @@ def download_reel_endpoint():
 @app.route('/api/file/<filename>')
 def serve_file(filename):
     try:
-        # Security checks
         if '..' in filename or '/' in filename:
             return jsonify({"error": "Invalid filename"}), 400
         
         file_path = os.path.join(DOWNLOAD_FOLDER, filename)
         
         if not os.path.exists(file_path):
-            return jsonify({"error": "File not found or expired"}), 404
+            return jsonify({"error": "File not found"}), 404
         
-        # Check file age
         file_age = time.time() - os.path.getctime(file_path)
         if file_age > MAX_FILE_AGE:
             os.remove(file_path)
@@ -147,20 +142,47 @@ def serve_file(filename):
         logger.error(f"File serving error: {str(e)}")
         return jsonify({"error": "Error serving file"}), 500
 
+@app.route('/api/upload-cookies', methods=['POST'])
+def upload_cookies():
+    """Endpoint to upload cookies file"""
+    try:
+        if 'cookies_file' not in request.files:
+            return jsonify({"success": False, "error": "No file uploaded"}), 400
+        
+        file = request.files['cookies_file']
+        if file.filename == '':
+            return jsonify({"success": False, "error": "No file selected"}), 400
+        
+        if file and file.filename.endswith('.txt'):
+            filename = f"cookies_{int(time.time())}.txt"
+            filepath = os.path.join(COOKIES_FOLDER, filename)
+            file.save(filepath)
+            
+            return jsonify({
+                "success": True,
+                "message": "Cookies file uploaded successfully",
+                "filename": filename
+            })
+        else:
+            return jsonify({"success": False, "error": "Only .txt files are supported"}), 400
+            
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 def cleanup_old_files():
     """Clean up old files"""
     try:
         deleted_count = 0
         current_time = time.time()
         
-        for filename in os.listdir(DOWNLOAD_FOLDER):
-            file_path = os.path.join(DOWNLOAD_FOLDER, filename)
-            if os.path.isfile(file_path):
-                file_age = current_time - os.path.getctime(file_path)
-                if file_age > MAX_FILE_AGE:
-                    os.remove(file_path)
-                    deleted_count += 1
-                    logger.info(f"Deleted old file: {filename}")
+        for folder in [DOWNLOAD_FOLDER, COOKIES_FOLDER]:
+            for filename in os.listdir(folder):
+                file_path = os.path.join(folder, filename)
+                if os.path.isfile(file_path):
+                    file_age = current_time - os.path.getctime(file_path)
+                    if file_age > MAX_FILE_AGE:
+                        os.remove(file_path)
+                        deleted_count += 1
         
         return deleted_count
     except Exception as e:
@@ -170,27 +192,26 @@ def cleanup_old_files():
 def background_cleanup():
     """Background cleanup thread"""
     while True:
-        time.sleep(CLEANUP_INTERVAL)
+        time.sleep(300)  # 5 minutes
         try:
             deleted = cleanup_old_files()
             if deleted > 0:
-                logger.info(f"Background cleanup deleted {deleted} files")
+                logger.info(f"Cleanup deleted {deleted} files")
         except Exception as e:
-            logger.error(f"Background cleanup error: {str(e)}")
+            logger.error(f"Cleanup error: {str(e)}")
 
-# Start background cleanup thread
+# Start background cleanup
 cleanup_thread = threading.Thread(target=background_cleanup, daemon=True)
 cleanup_thread.start()
 
-# Error handlers
 @app.errorhandler(429)
 def ratelimit_handler(e):
     return jsonify({
         "success": False,
-        "error": "Rate limit exceeded. Please try again in a few minutes."
+        "error": "Too many requests. Please wait a few minutes."
     }), 429
 
 if __name__ == '__main__':
-    logger.info("Starting Reels Downloader API...")
+    logger.info("Starting Reels Downloader with Cookie Support...")
     cleanup_old_files()
     app.run(host='0.0.0.0', port=5000, debug=False)
