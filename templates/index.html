@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Instagram & TikTok Downloader</title>
+    <title>Instagram Reel Downloader - AUTO DOWNLOAD</title>
     <style>
         * {
             margin: 0;
@@ -138,6 +138,10 @@
             background: #000;
         }
         
+        .download-section {
+            margin-top: 20px;
+        }
+        
         .download-btn {
             display: inline-block;
             background: #28a745;
@@ -148,11 +152,23 @@
             font-weight: 600;
             margin: 5px;
             transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
         }
         
         .download-btn:hover {
             background: #218838;
             transform: translateY(-2px);
+        }
+        
+        .auto-download {
+            background: #dc3545;
+            font-size: 18px;
+            padding: 15px 30px;
+        }
+        
+        .auto-download:hover {
+            background: #c82333;
         }
         
         .error {
@@ -173,6 +189,17 @@
             margin-top: 15px;
             text-align: center;
             border: 1px solid #c3e6cb;
+        }
+        
+        .auto-download-message {
+            background: #fff3cd;
+            color: #856404;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            text-align: center;
+            border: 1px solid #ffeaa7;
+            font-weight: bold;
         }
         
         .examples {
@@ -200,56 +227,55 @@
         }
         
         .info-box {
-            background: #fff3cd;
-            color: #856404;
+            background: #d4edda;
+            color: #155724;
             padding: 15px;
             border-radius: 10px;
             margin-top: 20px;
             text-align: center;
-            border: 1px solid #ffeaa7;
+            border: 1px solid #c3e6cb;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>📱 Video Downloader</h1>
-            <p>Download Instagram Reels & TikTok Videos</p>
+            <h1>🚀 AUTO Downloader</h1>
+            <p>Instagram Reels - Automatic Download</p>
         </div>
         
         <div class="content">
             <div class="input-group">
                 <input type="text" class="url-input" id="urlInput" 
-                       placeholder="Paste Instagram Reel or TikTok URL here..." autocomplete="off">
-                <button class="btn" id="downloadBtn">Download Video</button>
+                       placeholder="Paste Instagram Reel URL here..." autocomplete="off">
+                <button class="btn" id="downloadBtn">Download Reel</button>
             </div>
             
             <div class="loading" id="loading">
                 <div class="spinner"></div>
-                <p>Extracting video...</p>
+                <p>Extracting video from Instagram...</p>
             </div>
             
             <div class="result" id="result">
                 <div class="video-container">
                     <video id="videoPlayer" controls></video>
-                    <div>
-                        <a id="downloadLink" class="download-btn" download>Download Video</a>
+                    <div class="download-section">
+                        <button id="autoDownload" class="download-btn auto-download">
+                            ⚡ AUTO DOWNLOAD NOW
+                        </button>
                     </div>
                 </div>
             </div>
             
             <div class="examples">
-                <h3 style="margin-bottom: 15px; color: #1976d2;">🎯 Try These URLs:</h3>
+                <h3 style="margin-bottom: 15px; color: #1976d2;">🎯 Test URL:</h3>
                 <div class="example-url" onclick="useExample(this)">
-                    https://www.instagram.com/reel/DJg8Hc_zkot/
-                </div>
-                <div class="example-url" onclick="useExample(this)">
-                    https://www.tiktok.com/@username/video/123456789
+                    https://www.instagram.com/reel/DQoWU-Dk0N5/
                 </div>
             </div>
             
             <div class="info-box">
-                <strong>💡 How it works:</strong> Direct HTML parsing - No API limits!
+                <strong>💡 Feature:</strong> Click "AUTO DOWNLOAD NOW" for instant download!
             </div>
         </div>
     </div>
@@ -260,8 +286,11 @@
         const loading = document.getElementById('loading');
         const result = document.getElementById('result');
         const videoPlayer = document.getElementById('videoPlayer');
-        const downloadLink = document.getElementById('downloadLink');
+        const autoDownload = document.getElementById('autoDownload');
 
+        let currentVideoUrl = '';
+
+        // Main download function - AUTO DOWNLOAD
         downloadBtn.addEventListener('click', async () => {
             const url = urlInput.value.trim();
             
@@ -270,8 +299,8 @@
                 return;
             }
 
-            if (!url.includes('instagram.com') && !url.includes('tiktok.com')) {
-                showMessage('Please enter a valid Instagram or TikTok URL', 'error');
+            if (!url.includes('instagram.com')) {
+                showMessage('Please enter a valid Instagram Reel URL', 'error');
                 return;
             }
 
@@ -289,26 +318,90 @@
                 }
 
                 // Video URL set karo
-                const videoUrl = data.media_urls[0];
-                videoPlayer.src = videoUrl;
+                currentVideoUrl = data.media_urls[0];
+                videoPlayer.src = currentVideoUrl;
                 
-                // Download link set karo
-                const timestamp = new Date().getTime();
-                const filename = `${data.platform}_${timestamp}.mp4`;
-                downloadLink.href = videoUrl;
-                downloadLink.download = filename;
+                // Auto download setup
+                setupAutoDownload(currentVideoUrl, data.platform);
 
                 result.style.display = 'block';
-                showMessage(`✅ ${data.platform} video loaded successfully!`, 'success');
+                
+                // Automatically trigger download after 1 second
+                setTimeout(() => {
+                    triggerAutoDownload();
+                }, 1000);
 
             } catch (error) {
                 showMessage('❌ ' + error.message, 'error');
             } finally {
                 loading.style.display = 'none';
                 downloadBtn.disabled = false;
-                downloadBtn.textContent = 'Download Video';
+                downloadBtn.textContent = 'Download Reel';
             }
         });
+
+        function setupAutoDownload(videoUrl, platform) {
+            const timestamp = new Date().getTime();
+            const filename = `instagram_reel_${timestamp}.mp4`;
+            
+            // Auto download button
+            autoDownload.onclick = () => {
+                triggerDownload(videoUrl, filename);
+            };
+        }
+
+        function triggerAutoDownload() {
+            showAutoDownloadMessage('⚡ Starting automatic download...');
+            autoDownload.click();
+        }
+
+        function triggerDownload(videoUrl, filename) {
+            try {
+                autoDownload.disabled = true;
+                autoDownload.textContent = '📥 Downloading...';
+                
+                // Create invisible download link
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = videoUrl;
+                a.download = filename;
+                
+                // Add to page and click
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                
+                showAutoDownloadMessage('✅ Download started! Check your downloads folder.');
+                
+                // Reset button after 3 seconds
+                setTimeout(() => {
+                    autoDownload.disabled = false;
+                    autoDownload.textContent = '⚡ AUTO DOWNLOAD NOW';
+                }, 3000);
+                
+            } catch (error) {
+                showMessage('❌ Download failed: ' + error.message, 'error');
+                autoDownload.disabled = false;
+                autoDownload.textContent = '⚡ AUTO DOWNLOAD NOW';
+            }
+        }
+
+        function showAutoDownloadMessage(message) {
+            const oldMessage = document.querySelector('.auto-download-message');
+            if (oldMessage) {
+                oldMessage.remove();
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'auto-download-message';
+            messageDiv.textContent = message;
+            
+            document.querySelector('.video-container').appendChild(messageDiv);
+
+            setTimeout(() => {
+                messageDiv.remove();
+            }, 5000);
+        }
 
         function useExample(element) {
             urlInput.value = element.textContent.trim();
@@ -316,7 +409,6 @@
         }
 
         function showMessage(message, type) {
-            // Purani messages hatao
             const oldMessages = document.querySelectorAll('.error, .success');
             oldMessages.forEach(msg => msg.remove());
 
@@ -326,7 +418,6 @@
             
             document.querySelector('.content').insertBefore(messageDiv, document.querySelector('.examples'));
 
-            // 5 second baad message hatao
             setTimeout(() => {
                 messageDiv.remove();
             }, 5000);
@@ -339,7 +430,7 @@
             }
         });
 
-        // Auto-focus on input
+        // Auto-focus
         urlInput.focus();
     </script>
 </body>
