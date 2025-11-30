@@ -1,83 +1,136 @@
-import express from 'express';
-import cors from 'cors';
-import axios from 'axios';
-import dotenv from 'dotenv';
+from flask import Flask, request, jsonify, render_template
+import requests
+import os
 
-dotenv.config();
+app = Flask(__name__)
 
-const app = express();
-const port = process.env.PORT || 5000;
+class SocialMediaDownloader:
+    def __init__(self):
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        })
+        # RapidAPI Key - YOU NEED TO GET THIS FROM RAPIDAPI.COM
+        self.rapidapi_key = os.environ.get('RAPIDAPI_KEY', 'YOUR_RAPIDAPI_KEY_HERE')
+    
+    def download_instagram(self, url):
+        """Instagram download using RapidAPI - PROPER WORKING"""
+        try:
+            # Extract Reel ID from URL
+            if '/reel/' in url:
+                reel_id = url.split('/reel/')[1].split('/')[0].split('?')[0]
+            elif '/p/' in url:
+                reel_id = url.split('/p/')[1].split('/')[0].split('?')[0]
+            else:
+                return {'error': 'Invalid Instagram URL format'}
+            
+            # RapidAPI endpoint
+            api_url = "https://instagram-social-api.p.rapidapi.com/v1/post_info"
+            params = {
+                "code_or_id_or_url": reel_id
+            }
+            headers = {
+                "x-rapidapi-key": self.rapidapi_key,
+                "x-rapidapi-host": "instagram-social-api.p.rapidapi.com"
+            }
+            
+            response = self.session.get(api_url, params=params, headers=headers, timeout=30)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if data.get('data') and data['data'].get('video_versions'):
+                    video_url = data['data']['video_versions'][0]['url']
+                    return {
+                        'success': True,
+                        'platform': 'instagram',
+                        'media_urls': [video_url],
+                        'title': data['data'].get('caption', {}).get('text', 'Instagram Reel'),
+                        'post_url': url
+                    }
+                elif data.get('data') and data['data'].get('image_versions2'):
+                    image_url = data['data']['image_versions2']['candidates'][0]['url']
+                    return {
+                        'success': True,
+                        'platform': 'instagram',
+                        'media_urls': [image_url],
+                        'title': data['data'].get('caption', {}).get('text', 'Instagram Post'),
+                        'post_url': url
+                    }
+                else:
+                    return {'error': 'No media found in this post'}
+            else:
+                return {'error': f'API Error: {response.status_code}'}
+                
+        except Exception as e:
+            return {'error': f'Instagram error: {str(e)}'}
+    
+    def download_tiktok(self, url):
+        """TikTok download"""
+        try:
+            api_url = "https://tikwm.com/api/"
+            payload = {"url": url}
+            
+            response = self.session.post(api_url, json=payload, timeout=30)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('data') and data['data'].get('play'):
+                    video_url = data['data']['play']
+                    if not video_url.startswith('http'):
+                        video_url = 'https:' + video_url
+                    
+                    return {
+                        'success': True,
+                        'platform': 'tiktok',
+                        'media_urls': [video_url],
+                        'title': data['data'].get('title', 'TikTok Video'),
+                        'post_url': url
+                    }
+            
+            return {'error': 'TikTok download failed'}
+            
+        except Exception as e:
+            return {'error': f'TikTok error: {str(e)}'}
+    
+    def download_media(self, url):
+        if 'instagram.com' in url:
+            return self.download_instagram(url)
+        elif 'tiktok.com' in url:
+            return self.download_tiktok(url)
+        else:
+            return {'error': 'Unsupported platform. Use Instagram or TikTok.'}
 
-const allowedOrigins = [
-	'https://instagram-video-downloader-delta.vercel.app',
-	'http://127.0.0.1:5500',
-	'http://localhost:5500', 
-];
+downloader = SocialMediaDownloader()
 
-app.use(
-	cors({
-		origin: (origin, callback) => {
-			if (!origin || allowedOrigins.includes(origin)) {
-				callback(null, true);
-			} else {
-				callback(new Error('Not allowed by CORS'));
-			}
-		},
-		credentials: true, 
-	}),
-);
-app.use(express.json());
-app.get("/test", (req, res) => {
-		res.status(200).json({ success: success, message: 'hello' });
-})
+@app.route('/')
+def home():
+    return render_template('index.html')
 
-app.get('/download', async (req, res) => {
-	console.log('hello');
+@app.route('/api/download', methods=['POST', 'GET'])
+def download_media():
+    if request.method == 'GET':
+        url = request.args.get('url')
+    else:
+        data = request.get_json()
+        url = data.get('url') if data else None
+    
+    if not url:
+        return jsonify({'error': 'URL parameter is required'}), 400
+    
+    result = downloader.download_media(url)
+    return jsonify(result)
 
-	const { url } = req.query; 
-	console.log('URL:', url);
+@app.route('/api/status')
+def api_status():
+    return jsonify({
+        'status': 'active',
+        'service': 'Social Media Downloader',
+        'version': '5.0',
+        'supported_platforms': ['Instagram', 'TikTok'],
+        'note': 'Instagram uses RapidAPI - requires API key'
+    })
 
-	// Validate URL
-	if (!url || !url.startsWith('https://www.instagram.com')) {
-		return res.status(400).json({ success: false, message: 'A valid Instagram URL is required.' });
-	}
-
-	try {
-		const options = {
-			method: 'GET',
-			url: 'https://instagram-reels-downloader-api.p.rapidapi.com/download',
-			params: {
-				url: url,
-				userId: '25025320',
-			},
-
-			headers: {
-				'x-rapidapi-key': '12c2fa05b3mshccf8a4b3eb452ccp1380b7jsn71e1f5190176' || process.env.RAPIDAPI_KEY,
-				'x-rapidapi-host': 'instagram-reels-downloader-api.p.rapidapi.com',
-			},
-		};
-
-		// Make the request to RapidAPI
-		const response = await axios(options);
-		console.log(response);
-
-		// Debugging: Log the full response
-		console.log('API Response:', JSON.stringify(response.data, null, 2));
-
-		// Extract the video URL from the medias array
-		if (!response.data.data.medias || response.data.data.medias.length === 0) {
-			return res.status(404).json({ success: false, message: 'No video found in the response.' });
-		}
-
-		const videoUrl = response.data.data.medias[0].url;
-
-		// Send the video URL back to the client
-		res.json({ success: true, videoUrl: videoUrl });
-	} catch (error) {
-		console.error('Error:', error.response ? error.response.data : error.message);
-		console.log(error);
-		res.status(500).json({ success: false, message: 'Failed to fetch reels.', error });
-	}
-});
-
-export default app;
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
