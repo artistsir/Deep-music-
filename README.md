@@ -1,37 +1,27 @@
-# Social Media Downloader API
+# Reels Downloader API
 
-A complete API to download media from Instagram, Twitter, YouTube, and Facebook. Deployable on Render's free tier.
-
-## Features
-
-- 📷 Instagram Reels/Posts download
-- 🐦 Twitter video download  
-- 📺 YouTube video download (multiple qualities)
-- 👥 Facebook video download
-- 🎯 Simple REST API
-- 🌐 Web interface
-- 🚀 Easy deployment
+A Flask-based API to download Instagram and Facebook reels.
 
 ## Deployment on Render
 
-1. Fork this repository
-2. Go to [Render.com](https://render.com)
-3. Click "New +" → "Web Service"
-4. Connect your GitHub repository
+1. Fork/Create this repository
+2. Connect your GitHub to Render
+3. Create new Web Service
+4. Connect your repository
 5. Use these settings:
-   - **Name**: social-media-downloader
-   - **Environment**: Python
-   - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `gunicorn app:app`
-6. Click "Create Web Service"
+   - Build Command: `pip install -r requirements.txt`
+   - Start Command: `gunicorn app:app`
 
-## API Usage
+## API Endpoints
 
-### Download Media
-```http
-POST /api/download
-Content-Type: application/json
+### GET /
+Returns API information and usage.
 
+### POST /download
+Download a reel from URL.
+
+**Request:**
+```json
 {
-    "url": "https://www.instagram.com/p/Cexample/"
+    "url": "https://www.instagram.com/reel/EXAMPLE/"
 }
