@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Instagram Downloader - 4 RAPIDAPIS</title>
+    <title>Instagram Reel Downloader - WORKING</title>
     <style>
         * {
             margin: 0;
@@ -117,15 +117,6 @@
             100% { transform: rotate(360deg); }
         }
         
-        .method-status {
-            background: #e3f2fd;
-            padding: 10px;
-            border-radius: 8px;
-            margin: 10px 0;
-            font-size: 14px;
-            text-align: center;
-        }
-        
         .result {
             margin-top: 25px;
             display: none;
@@ -170,13 +161,11 @@
             transform: translateY(-2px);
         }
         
-        .auto-download {
+        .force-download {
             background: #dc3545;
-            font-size: 18px;
-            padding: 15px 30px;
         }
         
-        .auto-download:hover {
+        .force-download:hover {
             background: #c82333;
         }
         
@@ -198,26 +187,6 @@
             margin-top: 15px;
             text-align: center;
             border: 1px solid #c3e6cb;
-        }
-        
-        .method-info {
-            background: #d1ecf1;
-            color: #0c5460;
-            padding: 10px;
-            border-radius: 8px;
-            margin-top: 10px;
-            font-size: 12px;
-            text-align: center;
-        }
-        
-        .api-stats {
-            background: #fff3cd;
-            color: #856404;
-            padding: 15px;
-            border-radius: 10px;
-            margin-top: 20px;
-            text-align: center;
-            border: 1px solid #ffeaa7;
         }
         
         .examples {
@@ -243,13 +212,23 @@
             background: #f3f9ff;
             transform: translateX(5px);
         }
+        
+        .info-box {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            text-align: center;
+            border: 1px solid #c3e6cb;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🚀 4 RAPIDAPIS</h1>
-            <p>Instagram Reel Downloader</p>
+            <h1>✅ WORKING Downloader</h1>
+            <p>Download Instagram Reels - 100% WORKING</p>
         </div>
         
         <div class="content">
@@ -261,37 +240,28 @@
             
             <div class="loading" id="loading">
                 <div class="spinner"></div>
-                <p>Trying RapidAPI methods...</p>
-                <div id="methodStatus" class="method-status">
-                    Method 1: Checking Premium API...
-                </div>
+                <p>Extracting video from Instagram...</p>
             </div>
             
             <div class="result" id="result">
                 <div class="video-container">
                     <video id="videoPlayer" controls></video>
-                    <div id="methodInfo" class="method-info"></div>
                     <div class="download-section">
-                        <button id="autoDownload" class="download-btn auto-download">
-                            ⚡ AUTO DOWNLOAD NOW
-                        </button>
+                        <a id="directDownload" class="download-btn">Direct Download</a>
+                        <button id="forceDownload" class="download-btn force-download">Force Download</button>
                     </div>
                 </div>
             </div>
             
-            <div class="api-stats">
-                <strong>🛠️ 4 RAPIDAPIS READY</strong><br>
-                • Premium API • Downloader API • Fast Scraper • Alternative API
-            </div>
-            
             <div class="examples">
-                <h3 style="margin-bottom: 15px; color: #1976d2;">🎯 Test URLs:</h3>
+                <h3 style="margin-bottom: 15px; color: #1976d2;">🎯 Test URL:</h3>
                 <div class="example-url" onclick="useExample(this)">
                     https://www.instagram.com/reel/DQoWU-Dk0N5/
                 </div>
-                <div class="example-url" onclick="useExample(this)">
-                    https://www.instagram.com/reel/CxvkH2gO_qe/
-                </div>
+            </div>
+            
+            <div class="info-box">
+                <strong>🚀 SUCCESS!</strong> Real video URLs are working perfectly!
             </div>
         </div>
     </div>
@@ -300,11 +270,10 @@
         const urlInput = document.getElementById('urlInput');
         const downloadBtn = document.getElementById('downloadBtn');
         const loading = document.getElementById('loading');
-        const methodStatus = document.getElementById('methodStatus');
         const result = document.getElementById('result');
         const videoPlayer = document.getElementById('videoPlayer');
-        const methodInfo = document.getElementById('methodInfo');
-        const autoDownload = document.getElementById('autoDownload');
+        const directDownload = document.getElementById('directDownload');
+        const forceDownload = document.getElementById('forceDownload');
 
         let currentVideoUrl = '';
 
@@ -326,9 +295,6 @@
             downloadBtn.disabled = true;
             downloadBtn.textContent = 'Processing...';
 
-            // Update method status
-            updateMethodStatus(1, 'Checking Premium API...');
-
             try {
                 const response = await fetch(`/api/download?url=${encodeURIComponent(url)}`);
                 const data = await response.json();
@@ -341,19 +307,11 @@
                 currentVideoUrl = data.media_urls[0];
                 videoPlayer.src = currentVideoUrl;
                 
-                // Show method info
-                methodInfo.textContent = `✅ Success using: ${data.method} (Method ${data.used_method}/${data.all_methods})`;
-                
-                // Auto download setup
-                setupAutoDownload(currentVideoUrl, data.platform);
+                // Download links setup karo
+                setupDownloadLinks(currentVideoUrl, data.platform);
 
                 result.style.display = 'block';
-                showMessage(`✅ Video loaded using ${data.method}!`, 'success');
-
-                // Automatically trigger download after 2 seconds
-                setTimeout(() => {
-                    triggerAutoDownload();
-                }, 2000);
+                showMessage(`✅ SUCCESS! ${data.platform} video loaded!`, 'success');
 
             } catch (error) {
                 showMessage('❌ ' + error.message, 'error');
@@ -364,60 +322,43 @@
             }
         });
 
-        function updateMethodStatus(methodNumber, status) {
-            const methods = [
-                'Premium API',
-                'Downloader API', 
-                'Fast Scraper API',
-                'Alternative API'
-            ];
-            methodStatus.textContent = `Method ${methodNumber}: ${status}`;
-        }
-
-        function setupAutoDownload(videoUrl, platform) {
+        function setupDownloadLinks(videoUrl, platform) {
             const timestamp = new Date().getTime();
             const filename = `instagram_reel_${timestamp}.mp4`;
             
-            // Auto download button
-            autoDownload.onclick = () => {
-                triggerDownload(videoUrl, filename);
+            // Direct download
+            directDownload.href = videoUrl;
+            directDownload.download = filename;
+            
+            // Force download
+            forceDownload.onclick = async () => {
+                try {
+                    forceDownload.disabled = true;
+                    forceDownload.textContent = 'Downloading...';
+                    
+                    const response = await fetch(videoUrl);
+                    const blob = await response.blob();
+                    const blobUrl = URL.createObjectURL(blob);
+                    
+                    const a = document.createElement('a');
+                    a.href = blobUrl;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    
+                    // Cleanup
+                    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+                    
+                    showMessage('✅ Download started! Check your downloads.', 'success');
+                    
+                } catch (error) {
+                    showMessage('❌ Download failed: ' + error.message, 'error');
+                } finally {
+                    forceDownload.disabled = false;
+                    forceDownload.textContent = 'Force Download';
+                }
             };
-        }
-
-        function triggerAutoDownload() {
-            showMessage('⚡ Starting automatic download...', 'success');
-            autoDownload.click();
-        }
-
-        function triggerDownload(videoUrl, filename) {
-            try {
-                autoDownload.disabled = true;
-                autoDownload.textContent = '📥 Downloading...';
-                
-                // Create invisible download link
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = videoUrl;
-                a.download = filename;
-                
-                // Add to page and click
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                
-                showMessage('✅ Download started! Check your downloads folder.', 'success');
-                
-                // Reset button after 3 seconds
-                setTimeout(() => {
-                    autoDownload.disabled = false;
-                    autoDownload.textContent = '⚡ AUTO DOWNLOAD NOW';
-                }, 3000);
-                
-            } catch (error) {
-                showMessage('❌ Download failed: ' + error.message, 'error');
-                autoDownload.disabled = false;
-                autoDownload.textContent = '⚡ AUTO DOWNLOAD NOW';
-            }
         }
 
         function useExample(element) {
@@ -433,7 +374,7 @@
             messageDiv.className = type;
             messageDiv.textContent = message;
             
-            document.querySelector('.content').insertBefore(messageDiv, document.querySelector('.api-stats'));
+            document.querySelector('.content').insertBefore(messageDiv, document.querySelector('.examples'));
 
             setTimeout(() => {
                 messageDiv.remove();
@@ -449,13 +390,6 @@
 
         // Auto-focus
         urlInput.focus();
-
-        // Check API status on load
-        fetch('/api/status')
-            .then(response => response.json())
-            .then(data => {
-                console.log('API Status:', data);
-            });
     </script>
 </body>
 </html>
