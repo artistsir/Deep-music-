@@ -1,20 +1,93 @@
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            transition: left 0.5s;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instagram & TikTok Downloader</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
         
-        .btn:hover::before {
-            left: 100%;
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+            width: 100%;
+            max-width: 500px;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #E4405F 0%, #405DE6 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 16px;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .input-group {
+            margin-bottom: 25px;
+        }
+        
+        .url-input {
+            width: 100%;
+            padding: 15px 20px;
+            border: 2px solid #e1e5e9;
+            border-radius: 12px;
+            font-size: 16px;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+        }
+        
+        .url-input:focus {
+            outline: none;
+            border-color: #E4405F;
+            box-shadow: 0 0 0 3px rgba(228, 64, 95, 0.1);
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #E4405F 0%, #405DE6 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
         }
         
         .btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 12px 25px rgba(102, 126, 234, 0.35);
-        }
-        
-        .btn:active {
-            transform: translateY(-1px);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(228, 64, 95, 0.3);
         }
         
         .btn:disabled {
@@ -23,22 +96,20 @@
             transform: none;
         }
         
-        #spinner {
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
+        .loading {
+            text-align: center;
             padding: 30px;
+            display: none;
         }
         
-        .spinner-icon {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #667eea;
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #E4405F;
             border-radius: 50%;
-            width: 35px;
-            height: 35px;
+            width: 40px;
+            height: 40px;
             animation: spin 1s linear infinite;
-            margin-bottom: 15px;
+            margin: 0 auto 15px;
         }
         
         @keyframes spin {
@@ -46,61 +117,230 @@
             100% { transform: rotate(360deg); }
         }
         
-        #resultDiv {
+        .result {
+            margin-top: 25px;
             display: none;
-            flex-direction: column;
-            align-items: center;
-            margin-top: 20px;
-            padding: 25px;
-            background: linear-gradient(135deg, #f8f9ff 0%, #f0f2ff 100%);
-            border-radius: 15px;
-            text-align: center;
-            border: 1px solid #e8ecef;
         }
         
-        #resultVideo {
+        .video-container {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            border: 2px solid #e9ecef;
+        }
+        
+        video {
             width: 100%;
-            max-width: 300px;
+            max-width: 320px;
             border-radius: 12px;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
             background: #000;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
         }
         
         .download-btn {
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            display: inline-block;
+            background: #28a745;
             color: white;
             padding: 12px 25px;
             text-decoration: none;
-            border-radius: 10px;
+            border-radius: 8px;
             font-weight: 600;
-            font-size: 14px;
+            margin: 5px;
             transition: all 0.3s ease;
-            border: none;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            margin: 8px;
-            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
         }
         
         .download-btn:hover {
+            background: #218838;
             transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(40, 167, 69, 0.4);
+        }
+        
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            text-align: center;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            text-align: center;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .examples {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 25px;
+        }
+        
+        .example-url {
+            background: white;
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin: 8px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            cursor: pointer;
+            border: 1px solid #bbdefb;
+            transition: all 0.3s ease;
+        }
+        
+        .example-url:hover {
+            background: #f3f9ff;
+            transform: translateX(5px);
+        }
+        
+        .info-box {
+            background: #fff3cd;
+            color: #856404;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            text-align: center;
+            border: 1px solid #ffeaa7;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📱 Video Downloader</h1>
+            <p>Download Instagram Reels & TikTok Videos</p>
+        </div>
+        
+        <div class="content">
+            <div class="input-group">
+                <input type="text" class="url-input" id="urlInput" 
+                       placeholder="Paste Instagram Reel or TikTok URL here..." autocomplete="off">
+                <button class="btn" id="downloadBtn">Download Video</button>
+            </div>
+            
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Extracting video...</p>
+            </div>
+            
+            <div class="result" id="result">
+                <div class="video-container">
+                    <video id="videoPlayer" controls></video>
+                    <div>
+                        <a id="downloadLink" class="download-btn" download>Download Video</a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="examples">
+                <h3 style="margin-bottom: 15px; color: #1976d2;">🎯 Try These URLs:</h3>
+                <div class="example-url" onclick="useExample(this)">
+                    https://www.instagram.com/reel/DJg8Hc_zkot/
+                </div>
+                <div class="example-url" onclick="useExample(this)">
+                    https://www.tiktok.com/@username/video/123456789
+                </div>
+            </div>
+            
+            <div class="info-box">
+                <strong>💡 How it works:</strong> Direct HTML parsing - No API limits!
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const urlInput = document.getElementById('urlInput');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const loading = document.getElementById('loading');
+        const result = document.getElementById('result');
+        const videoPlayer = document.getElementById('videoPlayer');
+        const downloadLink = document.getElementById('downloadLink');
+
+        downloadBtn.addEventListener('click', async () => {
+            const url = urlInput.value.trim();
+            
+            if (!url) {
+                showMessage('Please enter a URL', 'error');
+                return;
+            }
+
+            if (!url.includes('instagram.com') && !url.includes('tiktok.com')) {
+                showMessage('Please enter a valid Instagram or TikTok URL', 'error');
+                return;
+            }
+
+            loading.style.display = 'block';
+            result.style.display = 'none';
+            downloadBtn.disabled = true;
+            downloadBtn.textContent = 'Processing...';
+
+            try {
+                const response = await fetch(`/api/download?url=${encodeURIComponent(url)}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                // Video URL set karo
+                const videoUrl = data.media_urls[0];
+                videoPlayer.src = videoUrl;
+                
+                // Download link set karo
+                const timestamp = new Date().getTime();
+                const filename = `${data.platform}_${timestamp}.mp4`;
+                downloadLink.href = videoUrl;
+                downloadLink.download = filename;
+
+                result.style.display = 'block';
+                showMessage(`✅ ${data.platform} video loaded successfully!`, 'success');
+
+            } catch (error) {
+                showMessage('❌ ' + error.message, 'error');
+            } finally {
+                loading.style.display = 'none';
+                downloadBtn.disabled = false;
+                downloadBtn.textContent = 'Download Video';
+            }
+        });
+
+        function useExample(element) {
+            urlInput.value = element.textContent.trim();
+            urlInput.focus();
         }
 
-        .force-download-btn {
-            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
-            color: white;
-            padding: 10px 20px;
-            text-decoration: none;
-            border-radius: 8px;
-            font-weight: 600;
-            font-size: 13px;
-            transition: all 0.3s ease;
-            border: none;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
+        function showMessage(message, type) {
+            // Purani messages hatao
+            const oldMessages = document.querySelectorAll('.error, .success');
+            oldMessages.forEach(msg => msg.remove());
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = type;
+            messageDiv.textContent = message;
+            
+            document.querySelector('.content').insertBefore(messageDiv, document.querySelector('.examples'));
+
+            // 5 second baad message hatao
+            setTimeout(() => {
+                messageDiv.remove();
+            }, 5000);
+        }
+
+        // Enter key support
+        urlInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                downloadBtn.click();
+            }
+        });
+
+        // Auto-focus on input
+        urlInput.focus();
+    </script>
+</body>
+</html>
