@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Instagram & TikTok Downloader</title>
+    <title>Download Instagram & TikTok</title>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: Arial, sans-serif;
         }
         
         body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #667eea, #764ba2);
             min-height: 100vh;
             padding: 20px;
             display: flex;
@@ -23,71 +23,63 @@
         
         .container {
             background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
             overflow: hidden;
             width: 100%;
-            max-width: 500px;
+            max-width: 400px;
         }
         
         .header {
-            background: linear-gradient(135deg, #E4405F 0%, #405DE6 100%);
+            background: linear-gradient(135deg, #E4405F, #405DE6);
             color: white;
-            padding: 30px;
+            padding: 25px;
             text-align: center;
         }
         
         .header h1 {
-            font-size: 28px;
-            margin-bottom: 10px;
-            font-weight: 700;
-        }
-        
-        .header p {
-            opacity: 0.9;
-            font-size: 16px;
+            font-size: 24px;
+            margin-bottom: 8px;
         }
         
         .content {
-            padding: 30px;
+            padding: 25px;
         }
         
         .input-group {
-            margin-bottom: 25px;
+            margin-bottom: 20px;
         }
         
         .url-input {
             width: 100%;
-            padding: 15px 20px;
-            border: 2px solid #e1e5e9;
-            border-radius: 12px;
-            font-size: 16px;
-            margin-bottom: 15px;
-            transition: all 0.3s ease;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 12px;
         }
         
         .url-input:focus {
             outline: none;
             border-color: #E4405F;
-            box-shadow: 0 0 0 3px rgba(228, 64, 95, 0.1);
         }
         
         .btn {
-            background: linear-gradient(135deg, #E4405F 0%, #405DE6 100%);
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #E4405F, #405DE6);
             color: white;
             border: none;
-            padding: 15px 30px;
-            border-radius: 12px;
+            border-radius: 8px;
             font-size: 16px;
-            font-weight: 600;
+            font-weight: bold;
             cursor: pointer;
-            transition: all 0.3s ease;
-            width: 100%;
+            transition: all 0.3s;
         }
         
         .btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(228, 64, 95, 0.3);
+            box-shadow: 0 5px 15px rgba(228, 64, 95, 0.3);
         }
         
         .btn:disabled {
@@ -98,18 +90,18 @@
         
         .loading {
             text-align: center;
-            padding: 30px;
+            padding: 20px;
             display: none;
         }
         
         .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #E4405F;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #E4405F;
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
+            width: 30px;
+            height: 30px;
             animation: spin 1s linear infinite;
-            margin: 0 auto 15px;
+            margin: 0 auto 10px;
         }
         
         @keyframes spin {
@@ -118,95 +110,76 @@
         }
         
         .result {
-            margin-top: 25px;
+            margin-top: 20px;
             display: none;
         }
         
         .video-container {
             background: #f8f9fa;
-            padding: 25px;
-            border-radius: 15px;
+            padding: 15px;
+            border-radius: 10px;
             text-align: center;
-            border: 2px solid #e9ecef;
         }
         
         video {
             width: 100%;
-            max-width: 320px;
-            border-radius: 12px;
-            margin-bottom: 20px;
-            background: #000;
+            max-width: 300px;
+            border-radius: 8px;
+            margin-bottom: 15px;
         }
         
         .download-btn {
             display: inline-block;
             background: #28a745;
             color: white;
-            padding: 12px 25px;
+            padding: 10px 20px;
             text-decoration: none;
-            border-radius: 8px;
-            font-weight: 600;
+            border-radius: 6px;
+            font-weight: bold;
             margin: 5px;
-            transition: all 0.3s ease;
         }
         
         .download-btn:hover {
             background: #218838;
-            transform: translateY(-2px);
         }
         
         .error {
             background: #f8d7da;
             color: #721c24;
-            padding: 15px;
-            border-radius: 10px;
+            padding: 12px;
+            border-radius: 8px;
             margin-top: 15px;
             text-align: center;
-            border: 1px solid #f5c6cb;
         }
         
         .success {
             background: #d4edda;
             color: #155724;
-            padding: 15px;
-            border-radius: 10px;
+            padding: 12px;
+            border-radius: 8px;
             margin-top: 15px;
             text-align: center;
-            border: 1px solid #c3e6cb;
         }
         
         .examples {
             background: #e3f2fd;
-            padding: 20px;
-            border-radius: 12px;
-            margin-top: 25px;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
         }
         
         .example-url {
             background: white;
-            padding: 12px 15px;
-            border-radius: 8px;
-            margin: 8px 0;
-            font-family: 'Courier New', monospace;
+            padding: 8px 10px;
+            border-radius: 5px;
+            margin: 5px 0;
             font-size: 12px;
             cursor: pointer;
-            border: 1px solid #bbdefb;
-            transition: all 0.3s ease;
+            border: 1px solid #ddd;
         }
         
         .example-url:hover {
-            background: #f3f9ff;
-            transform: translateX(5px);
-        }
-        
-        .info-box {
-            background: #fff3cd;
-            color: #856404;
-            padding: 15px;
-            border-radius: 10px;
-            margin-top: 20px;
-            text-align: center;
-            border: 1px solid #ffeaa7;
+            background: #f0f0f0;
         }
     </style>
 </head>
@@ -214,19 +187,19 @@
     <div class="container">
         <div class="header">
             <h1>📱 Video Downloader</h1>
-            <p>Download Instagram Reels & TikTok Videos</p>
+            <p>Download Instagram & TikTok Videos</p>
         </div>
         
         <div class="content">
             <div class="input-group">
                 <input type="text" class="url-input" id="urlInput" 
-                       placeholder="Paste Instagram Reel or TikTok URL here..." autocomplete="off">
+                       placeholder="Paste Instagram or TikTok URL here...">
                 <button class="btn" id="downloadBtn">Download Video</button>
             </div>
             
             <div class="loading" id="loading">
                 <div class="spinner"></div>
-                <p>Extracting video...</p>
+                <p>Downloading video...</p>
             </div>
             
             <div class="result" id="result">
@@ -239,17 +212,13 @@
             </div>
             
             <div class="examples">
-                <h3 style="margin-bottom: 15px; color: #1976d2;">🎯 Try These URLs:</h3>
+                <p><strong>Try these URLs:</strong></p>
                 <div class="example-url" onclick="useExample(this)">
                     https://www.instagram.com/reel/DJg8Hc_zkot/
                 </div>
                 <div class="example-url" onclick="useExample(this)">
                     https://www.tiktok.com/@username/video/123456789
                 </div>
-            </div>
-            
-            <div class="info-box">
-                <strong>💡 How it works:</strong> Direct HTML parsing - No API limits!
             </div>
         </div>
     </div>
@@ -278,7 +247,6 @@
             loading.style.display = 'block';
             result.style.display = 'none';
             downloadBtn.disabled = true;
-            downloadBtn.textContent = 'Processing...';
 
             try {
                 const response = await fetch(`/api/download?url=${encodeURIComponent(url)}`);
@@ -293,10 +261,8 @@
                 videoPlayer.src = videoUrl;
                 
                 // Download link set karo
-                const timestamp = new Date().getTime();
-                const filename = `${data.platform}_${timestamp}.mp4`;
                 downloadLink.href = videoUrl;
-                downloadLink.download = filename;
+                downloadLink.download = `${data.platform}_video.mp4`;
 
                 result.style.display = 'block';
                 showMessage(`✅ ${data.platform} video loaded successfully!`, 'success');
@@ -306,13 +272,11 @@
             } finally {
                 loading.style.display = 'none';
                 downloadBtn.disabled = false;
-                downloadBtn.textContent = 'Download Video';
             }
         });
 
         function useExample(element) {
             urlInput.value = element.textContent.trim();
-            urlInput.focus();
         }
 
         function showMessage(message, type) {
@@ -338,9 +302,6 @@
                 downloadBtn.click();
             }
         });
-
-        // Auto-focus on input
-        urlInput.focus();
     </script>
 </body>
 </html>
