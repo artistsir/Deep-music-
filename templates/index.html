@@ -3,91 +3,101 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Instagram Reel Downloader - WORKING</title>
+    <title>Reels Downloader</title>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
         
         body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
         }
         
         .container {
+            max-width: 800px;
+            margin: 0 auto;
             background: white;
-            border-radius: 20px;
+            border-radius: 15px;
             box-shadow: 0 20px 40px rgba(0,0,0,0.1);
             overflow: hidden;
-            width: 100%;
-            max-width: 500px;
         }
         
         .header {
-            background: linear-gradient(135deg, #E4405F 0%, #405DE6 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             padding: 30px;
             text-align: center;
         }
         
         .header h1 {
-            font-size: 28px;
+            font-size: 2.5em;
             margin-bottom: 10px;
-            font-weight: 700;
         }
         
         .header p {
             opacity: 0.9;
-            font-size: 16px;
+            font-size: 1.1em;
         }
         
         .content {
-            padding: 30px;
+            padding: 40px;
         }
         
         .input-group {
             margin-bottom: 25px;
         }
         
-        .url-input {
-            width: 100%;
-            padding: 15px 20px;
-            border: 2px solid #e1e5e9;
-            border-radius: 12px;
-            font-size: 16px;
-            margin-bottom: 15px;
-            transition: all 0.3s ease;
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
         }
         
-        .url-input:focus {
+        .input-group input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        .input-group input:focus {
             outline: none;
-            border-color: #E4405F;
-            box-shadow: 0 0 0 3px rgba(228, 64, 95, 0.1);
+            border-color: #667eea;
+        }
+        
+        .checkbox {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .checkbox input {
+            width: auto;
         }
         
         .btn {
-            background: linear-gradient(135deg, #E4405F 0%, #405DE6 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
             padding: 15px 30px;
-            border-radius: 12px;
+            border-radius: 8px;
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: transform 0.2s;
             width: 100%;
         }
         
         .btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(228, 64, 95, 0.3);
         }
         
         .btn:disabled {
@@ -96,15 +106,34 @@
             transform: none;
         }
         
+        .result {
+            margin-top: 25px;
+            padding: 20px;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        
         .loading {
             text-align: center;
-            padding: 30px;
+            padding: 20px;
             display: none;
         }
         
         .spinner {
             border: 4px solid #f3f3f3;
-            border-top: 4px solid #E4405F;
+            border-top: 4px solid #667eea;
             border-radius: 50%;
             width: 40px;
             height: 40px;
@@ -117,279 +146,171 @@
             100% { transform: rotate(360deg); }
         }
         
-        .result {
-            margin-top: 25px;
-            display: none;
-        }
-        
-        .video-container {
-            background: #f8f9fa;
-            padding: 25px;
-            border-radius: 15px;
-            text-align: center;
-            border: 2px solid #e9ecef;
-        }
-        
-        video {
-            width: 100%;
-            max-width: 320px;
-            border-radius: 12px;
-            margin-bottom: 20px;
-            background: #000;
-        }
-        
-        .download-section {
-            margin-top: 20px;
-        }
-        
-        .download-btn {
+        .download-link {
             display: inline-block;
             background: #28a745;
             color: white;
-            padding: 12px 25px;
+            padding: 10px 20px;
+            border-radius: 5px;
             text-decoration: none;
-            border-radius: 8px;
-            font-weight: 600;
-            margin: 5px;
-            transition: all 0.3s ease;
-            border: none;
-            cursor: pointer;
+            margin-top: 10px;
+            transition: background 0.3s;
         }
         
-        .download-btn:hover {
+        .download-link:hover {
             background: #218838;
-            transform: translateY(-2px);
         }
         
-        .force-download {
-            background: #dc3545;
-        }
-        
-        .force-download:hover {
-            background: #c82333;
-        }
-        
-        .error {
-            background: #f8d7da;
-            color: #721c24;
-            padding: 15px;
-            border-radius: 10px;
-            margin-top: 15px;
-            text-align: center;
-            border: 1px solid #f5c6cb;
-        }
-        
-        .success {
-            background: #d4edda;
-            color: #155724;
-            padding: 15px;
-            border-radius: 10px;
-            margin-top: 15px;
-            text-align: center;
-            border: 1px solid #c3e6cb;
-        }
-        
-        .examples {
-            background: #e3f2fd;
+        .instructions {
+            background: #f8f9fa;
             padding: 20px;
-            border-radius: 12px;
-            margin-top: 25px;
-        }
-        
-        .example-url {
-            background: white;
-            padding: 12px 15px;
             border-radius: 8px;
-            margin: 8px 0;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            cursor: pointer;
-            border: 1px solid #bbdefb;
-            transition: all 0.3s ease;
+            margin-top: 30px;
         }
         
-        .example-url:hover {
-            background: #f3f9ff;
-            transform: translateX(5px);
+        .instructions h3 {
+            margin-bottom: 15px;
+            color: #333;
         }
         
-        .info-box {
-            background: #d4edda;
-            color: #155724;
-            padding: 15px;
-            border-radius: 10px;
-            margin-top: 20px;
-            text-align: center;
-            border: 1px solid #c3e6cb;
+        .instructions ul {
+            list-style-position: inside;
+            color: #666;
+        }
+        
+        .instructions li {
+            margin-bottom: 8px;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>✅ WORKING Downloader</h1>
-            <p>Download Instagram Reels - 100% WORKING</p>
+            <h1>📱 Reels Downloader</h1>
+            <p>Download Instagram & Facebook Reels Instantly</p>
         </div>
         
         <div class="content">
             <div class="input-group">
-                <input type="text" class="url-input" id="urlInput" 
-                       placeholder="Paste Instagram Reel URL here..." autocomplete="off">
-                <button class="btn" id="downloadBtn">Download Reel</button>
+                <label for="reelUrl">Reel URL:</label>
+                <input 
+                    type="url" 
+                    id="reelUrl" 
+                    placeholder="Paste Instagram or Facebook Reel URL here..."
+                    required
+                >
             </div>
+            
+            <div class="input-group checkbox">
+                <input type="checkbox" id="useProxy">
+                <label for="useProxy">Use proxy (recommended if facing blocks)</label>
+            </div>
+            
+            <button class="btn" id="downloadBtn" onclick="downloadReel()">
+                Download Reel
+            </button>
             
             <div class="loading" id="loading">
                 <div class="spinner"></div>
-                <p>Extracting video from Instagram...</p>
+                <p>Downloading your reel... This may take a few seconds.</p>
             </div>
             
-            <div class="result" id="result">
-                <div class="video-container">
-                    <video id="videoPlayer" controls></video>
-                    <div class="download-section">
-                        <a id="directDownload" class="download-btn">Direct Download</a>
-                        <button id="forceDownload" class="download-btn force-download">Force Download</button>
-                    </div>
-                </div>
-            </div>
+            <div class="result" id="result"></div>
             
-            <div class="examples">
-                <h3 style="margin-bottom: 15px; color: #1976d2;">🎯 Test URL:</h3>
-                <div class="example-url" onclick="useExample(this)">
-                    https://www.instagram.com/reel/DQoWU-Dk0N5/
-                </div>
-            </div>
-            
-            <div class="info-box">
-                <strong>🚀 SUCCESS!</strong> Real video URLs are working perfectly!
+            <div class="instructions">
+                <h3>How to use:</h3>
+                <ul>
+                    <li>Copy the reel URL from Instagram or Facebook</li>
+                    <li>Paste it in the input field above</li>
+                    <li>Click "Download Reel"</li>
+                    <li>Wait for processing and download your file</li>
+                </ul>
+                <p><strong>Note:</strong> Private or restricted reels may not be downloadable.</p>
             </div>
         </div>
     </div>
 
     <script>
-        const urlInput = document.getElementById('urlInput');
-        const downloadBtn = document.getElementById('downloadBtn');
-        const loading = document.getElementById('loading');
-        const result = document.getElementById('result');
-        const videoPlayer = document.getElementById('videoPlayer');
-        const directDownload = document.getElementById('directDownload');
-        const forceDownload = document.getElementById('forceDownload');
-
-        let currentVideoUrl = '';
-
-        downloadBtn.addEventListener('click', async () => {
-            const url = urlInput.value.trim();
+        async function downloadReel() {
+            const url = document.getElementById('reelUrl').value;
+            const useProxy = document.getElementById('useProxy').checked;
+            const downloadBtn = document.getElementById('downloadBtn');
+            const loading = document.getElementById('loading');
+            const result = document.getElementById('result');
             
             if (!url) {
-                showMessage('Please enter a URL', 'error');
+                showResult('error', 'Please enter a valid URL');
                 return;
             }
-
-            if (!url.includes('instagram.com')) {
-                showMessage('Please enter a valid Instagram Reel URL', 'error');
+            
+            // Validate URL
+            if (!url.includes('instagram.com') && !url.includes('facebook.com') && !url.includes('fb.watch')) {
+                showResult('error', 'Please enter a valid Instagram or Facebook URL');
                 return;
             }
-
+            
+            // Show loading, hide result
             loading.style.display = 'block';
             result.style.display = 'none';
             downloadBtn.disabled = true;
-            downloadBtn.textContent = 'Processing...';
-
+            downloadBtn.textContent = 'Downloading...';
+            
             try {
-                const response = await fetch(`/api/download?url=${encodeURIComponent(url)}`);
-                const data = await response.json();
-
-                if (data.error) {
-                    throw new Error(data.error);
-                }
-
-                // Video URL set karo
-                currentVideoUrl = data.media_urls[0];
-                videoPlayer.src = currentVideoUrl;
+                const response = await fetch('/api/download', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        url: url,
+                        use_proxy: useProxy
+                    })
+                });
                 
-                // Download links setup karo
-                setupDownloadLinks(currentVideoUrl, data.platform);
-
-                result.style.display = 'block';
-                showMessage(`✅ SUCCESS! ${data.platform} video loaded!`, 'success');
-
+                const data = await response.json();
+                
+                if (data.success) {
+                    showResult('success', 
+                        `✅ ${data.message}<br>
+                         ⏱️ Processing Time: ${data.processing_time}<br>
+                         💾 File Size: ${formatFileSize(data.file_size)}<br>
+                         <a href="${data.download_url}" class="download-link" download>
+                            📥 Download Now
+                         </a>`
+                    );
+                } else {
+                    showResult('error', `❌ ${data.error}`);
+                }
+                
             } catch (error) {
-                showMessage('❌ ' + error.message, 'error');
+                showResult('error', `❌ Network error: ${error.message}`);
             } finally {
                 loading.style.display = 'none';
                 downloadBtn.disabled = false;
                 downloadBtn.textContent = 'Download Reel';
             }
-        });
-
-        function setupDownloadLinks(videoUrl, platform) {
-            const timestamp = new Date().getTime();
-            const filename = `instagram_reel_${timestamp}.mp4`;
-            
-            // Direct download
-            directDownload.href = videoUrl;
-            directDownload.download = filename;
-            
-            // Force download
-            forceDownload.onclick = async () => {
-                try {
-                    forceDownload.disabled = true;
-                    forceDownload.textContent = 'Downloading...';
-                    
-                    const response = await fetch(videoUrl);
-                    const blob = await response.blob();
-                    const blobUrl = URL.createObjectURL(blob);
-                    
-                    const a = document.createElement('a');
-                    a.href = blobUrl;
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    
-                    // Cleanup
-                    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-                    
-                    showMessage('✅ Download started! Check your downloads.', 'success');
-                    
-                } catch (error) {
-                    showMessage('❌ Download failed: ' + error.message, 'error');
-                } finally {
-                    forceDownload.disabled = false;
-                    forceDownload.textContent = 'Force Download';
-                }
-            };
         }
-
-        function useExample(element) {
-            urlInput.value = element.textContent.trim();
-            urlInput.focus();
+        
+        function showResult(type, message) {
+            const result = document.getElementById('result');
+            result.className = `result ${type}`;
+            result.innerHTML = message;
+            result.style.display = 'block';
         }
-
-        function showMessage(message, type) {
-            const oldMessages = document.querySelectorAll('.error, .success');
-            oldMessages.forEach(msg => msg.remove());
-
-            const messageDiv = document.createElement('div');
-            messageDiv.className = type;
-            messageDiv.textContent = message;
-            
-            document.querySelector('.content').insertBefore(messageDiv, document.querySelector('.examples'));
-
-            setTimeout(() => {
-                messageDiv.remove();
-            }, 5000);
+        
+        function formatFileSize(bytes) {
+            if (!bytes) return 'Unknown';
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
         }
-
+        
         // Enter key support
-        urlInput.addEventListener('keypress', (e) => {
+        document.getElementById('reelUrl').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
-                downloadBtn.click();
+                downloadReel();
             }
         });
-
-        // Auto-focus
-        urlInput.focus();
     </script>
 </body>
 </html>
