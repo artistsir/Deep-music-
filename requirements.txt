@@ -1,6 +1,4 @@
 Flask==2.3.3
 requests==2.31.0
 yt-dlp==2023.11.16
-beautifulsoup4==4.12.2
-lxml==4.9.3
-urllib3==1.26.18
+gunicorn==21.2.0
