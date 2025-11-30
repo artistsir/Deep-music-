@@ -1,241 +1,231 @@
-import requests
 import os
 import uuid
 import time
 import random
-import re
-import json
-from urllib.parse import urlparse, unquote
 import logging
+from urllib.parse import unquote
 
 logger = logging.getLogger(__name__)
 
-class ReelDownloader:
-    def __init__(self):
-        self.session = requests.Session()
-        self.setup_headers()
-    
-    def setup_headers(self):
-        """Setup realistic headers to avoid detection"""
-        self.headers_list = [
-            {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'DNT': '1',
-                'Connection': 'keep-alive',
-                'Upgrade-Insecure-Requests': '1',
-            },
-            {
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.5',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'DNT': '1',
-                'Connection': 'keep-alive',
-            },
-            {
-                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.5',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'DNT': '1',
-                'Connection': 'keep-alive',
-            }
-        ]
-    
-    def get_random_headers(self):
-        return random.choice(self.headers_list)
-    
-    def download_file(self, url, filepath, proxy=None):
-        """Download file with retry mechanism"""
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                headers = self.get_random_headers()
-                proxies = {'http': proxy, 'https': proxy} if proxy else None
-                
-                response = self.session.get(
-                    url, 
-                    headers=headers, 
-                    proxies=proxies,
-                    stream=True,
-                    timeout=30
-                )
-                response.raise_for_status()
-                
-                with open(filepath, 'wb') as f:
-                    for chunk in response.iter_content(chunk_size=8192):
-                        if chunk:
-                            f.write(chunk)
-                
-                # Verify file was downloaded
-                if os.path.getsize(filepath) > 0:
-                    return True
-                else:
-                    os.remove(filepath)
-                    return False
-                    
-            except Exception as e:
-                logger.warning(f"Download attempt {attempt + 1} failed: {str(e)}")
-                if attempt == max_retries - 1:
-                    return False
-                time.sleep(2 ** attempt)  # Exponential backoff
-        
-        return False
-    
-    def extract_instagram_reel(self, url, download_folder):
-        """Extract Instagram reel using multiple methods"""
-        try:
-            # Method 1: Use instagram-scraper alternative approach
-            return self.extract_instagram_direct(url, download_folder)
-        except Exception as e:
-            logger.error(f"Instagram extraction failed: {str(e)}")
-            return None
-    
-    def extract_instagram_direct(self, url, download_folder):
-        """Direct Instagram extraction method"""
-        try:
-            # This would use Instagram's private API or alternative methods
-            # For now, we'll use a simplified approach
-            
-            headers = self.get_random_headers()
-            response = self.session.get(url, headers=headers, timeout=15)
-            
-            # Look for video URLs in the HTML
-            video_patterns = [
-                r'"video_url":"([^"]+)"',
-                r'content="[^"]*video_url[^"]*" content="([^"]+)"',
-                r'src="([^"]+\.mp4[^"]*)"',
-            ]
-            
-            for pattern in video_patterns:
-                matches = re.findall(pattern, response.text)
-                for match in matches:
-                    video_url = match.replace('\\u0025', '%').replace('\\u0026', '&')
-                    if '.mp4' in video_url:
-                        return video_url
-            
-            return None
-            
-        except Exception as e:
-            logger.error(f"Direct extraction failed: {str(e)}")
-            return None
-    
-    def extract_facebook_reel(self, url, download_folder):
-        """Extract Facebook reel"""
-        try:
-            headers = self.get_random_headers()
-            response = self.session.get(url, headers=headers, timeout=15)
-            
-            # Look for video URLs in Facebook's JSON structure
-            video_patterns = [
-                r'"video_url":"([^"]+)"',
-                r'hd_src:"([^"]+)"',
-                r'sd_src:"([^"]+)"',
-                r'content="[^"]*video:url[^"]*" content="([^"]+)"',
-            ]
-            
-            for pattern in video_patterns:
-                matches = re.findall(pattern, response.text)
-                for match in matches:
-                    video_url = unquote(match.replace('\\u0025', '%').replace('\\u0026', '&'))
-                    if any(ext in video_url.lower() for ext in ['.mp4', '.mov', '.avi']):
-                        return video_url
-            
-            return None
-            
-        except Exception as e:
-            logger.error(f"Facebook extraction failed: {str(e)}")
-            return None
-
-def download_reel_advanced(url, download_folder, proxy=None):
-    """Main download function with advanced features"""
-    downloader = ReelDownloader()
-    
+def download_reel_smart(url, download_folder):
+    """
+    Smart downloader that uses multiple methods with proper configuration
+    """
     try:
-        # Generate unique filename
-        filename = f"reel_{uuid.uuid4().hex}.mp4"
-        filepath = os.path.join(download_folder, filename)
+        logger.info(f"Starting smart download for: {url}")
         
-        logger.info(f"Starting download process for: {url}")
+        # Method 1: Try yt-dlp with proper configuration (Primary)
+        try:
+            result = download_with_ytdlp_advanced(url, download_folder)
+            if result['success']:
+                logger.info("Successfully downloaded with yt-dlp")
+                return result
+        except Exception as e:
+            logger.warning(f"yt-dlp method failed: {str(e)}")
         
-        # Determine platform and extract video URL
-        video_url = None
+        # Method 2: Try alternative approach
+        try:
+            result = download_with_alternative(url, download_folder)
+            if result['success']:
+                logger.info("Successfully downloaded with alternative method")
+                return result
+        except Exception as e:
+            logger.warning(f"Alternative method failed: {str(e)}")
         
-        if 'instagram.com' in url:
-            logger.info("Detected Instagram URL")
-            video_url = downloader.extract_instagram_reel(url, download_folder)
-        elif 'facebook.com' in url or 'fb.watch' in url:
-            logger.info("Detected Facebook URL")
-            video_url = downloader.extract_facebook_reel(url, download_folder)
-        
-        if not video_url:
-            # Fallback: Use yt-dlp if available
-            try:
-                return download_with_ytdlp(url, download_folder)
-            except Exception as e:
-                logger.error(f"yt-dlp fallback failed: {str(e)}")
-                return {
-                    "success": False,
-                    "error": "Could not extract video URL. The reel might be private or unavailable."
-                }
-        
-        logger.info(f"Extracted video URL: {video_url[:100]}...")
-        
-        # Download the video
-        success = downloader.download_file(video_url, filepath, proxy)
-        
-        if success and os.path.exists(filepath) and os.path.getsize(filepath) > 0:
-            file_size = os.path.getsize(filepath)
-            
-            return {
-                "success": True,
-                "filename": filename,
-                "filepath": filepath,
-                "file_size": file_size,
-                "message": "Download completed successfully"
-            }
-        else:
-            if os.path.exists(filepath):
-                os.remove(filepath)
-            return {
-                "success": False,
-                "error": "Download failed or file is empty"
-            }
+        return {
+            "success": False,
+            "error": "All download methods failed. The reel might be private, geo-restricted, or unavailable."
+        }
             
     except Exception as e:
-        logger.error(f"Advanced download failed: {str(e)}")
+        logger.error(f"Smart download failed: {str(e)}")
         return {
             "success": False,
             "error": f"Download failed: {str(e)}"
         }
 
-def download_with_ytdlp(url, download_folder):
-    """Fallback method using yt-dlp"""
+def download_with_ytdlp_advanced(url, download_folder):
+    """
+    Advanced yt-dlp downloader with proper configuration
+    """
     try:
         import yt_dlp
         
+        # Generate unique filename
+        filename = f"reel_{uuid.uuid4().hex}.mp4"
+        filepath = os.path.join(download_folder, filename)
+        
+        # Advanced yt-dlp configuration
         ydl_opts = {
-            'outtmpl': os.path.join(download_folder, '%(title)s_%(id)s.%(ext)s'),
-            'format': 'best[height<=720]',
+            'outtmpl': filepath.replace('.mp4', '') + '.%(ext)s',
+            'format': 'best[height<=720]/best',
+            'quiet': False,
+            'no_warnings': False,
+            'extract_flat': False,
+            'writeinfojson': False,
+            'writethumbnail': False,
+            'writesubtitles': False,
+            'writeautomaticsub': False,
+            'consoletitle': False,
+            
+            # HTTP settings
+            'socket_timeout': 30,
+            'retries': 3,
+            'fragment_retries': 3,
+            'skip_unavailable_fragments': True,
+            
+            # Throttling to avoid blocks
+            'ratelimit': 1024000,  # 1 MB/s
+            'throttledratelimit': 2048000,
+            
+            # Extractor options
+            'extractor_args': {
+                'instagram': {
+                    'feed': {'endpoints': False},
+                    'story': {'endpoints': False},
+                    'highlights': {'endpoints': False},
+                }
+            },
+            
+            # Post-processing
+            'postprocessors': [],
+            
+            # Cookies and headers
+            'cookiefile': None,
+            
+            # Progress hooks
+            'progress_hooks': [lambda d: _progress_hook(d, url)],
+        }
+        
+        # Platform-specific options
+        if 'instagram.com' in url:
+            ydl_opts.update({
+                'extractor_args': {'instagram': {'feed': {'endpoints': False}}},
+            })
+        elif 'facebook.com' in url or 'fb.watch' in url:
+            ydl_opts.update({
+                'extractor_args': {'facebook': {}},
+            })
+        
+        logger.info(f"Downloading with yt-dlp: {url}")
+        
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            # Extract info first
+            info = ydl.extract_info(url, download=False)
+            logger.info(f"Video info: {info.get('title', 'Unknown')}")
+            
+            # Now download
+            ydl.download([url])
+            
+            # Get the actual downloaded filename
+            actual_filename = ydl.prepare_filename(info)
+            final_filename = f"reel_{uuid.uuid4().hex}.mp4"
+            final_filepath = os.path.join(download_folder, final_filename)
+            
+            # Rename to our format
+            if os.path.exists(actual_filename):
+                os.rename(actual_filename, final_filepath)
+            else:
+                # Try with .mp4 extension
+                actual_filename_mp4 = actual_filename.replace('.webm', '.mp4').replace('.mkv', '.mp4')
+                if os.path.exists(actual_filename_mp4):
+                    os.rename(actual_filename_mp4, final_filepath)
+                else:
+                    # Find the actual downloaded file
+                    for f in os.listdir(download_folder):
+                        if f.startswith(os.path.basename(actual_filename).split('.')[0]):
+                            os.rename(os.path.join(download_folder, f), final_filepath)
+                            break
+                    else:
+                        return {
+                            "success": False,
+                            "error": "Downloaded file not found"
+                        }
+        
+        # Verify download
+        if os.path.exists(final_filepath) and os.path.getsize(final_filepath) > 0:
+            file_size = os.path.getsize(final_filepath)
+            
+            return {
+                "success": True,
+                "filename": final_filename,
+                "filepath": final_filepath,
+                "file_size": file_size,
+                "title": info.get('title', 'reel'),
+                "duration": info.get('duration', 'Unknown'),
+                "thumbnail": info.get('thumbnail', ''),
+                "message": "Download completed successfully"
+            }
+        else:
+            return {
+                "success": False,
+                "error": "Downloaded file is empty or missing"
+            }
+        
+    except yt_dlp.utils.DownloadError as e:
+        error_msg = str(e)
+        logger.error(f"yt-dlp DownloadError: {error_msg}")
+        
+        # Handle specific errors
+        if 'Private' in error_msg:
+            return {"success": False, "error": "This reel is private and cannot be downloaded"}
+        elif 'not found' in error_msg.lower():
+            return {"success": False, "error": "Reel not found or deleted"}
+        elif 'age restricted' in error_msg.lower():
+            return {"success": False, "error": "Age-restricted content cannot be downloaded"}
+        elif 'login required' in error_msg.lower():
+            return {"success": False, "error": "Login required to access this content"}
+        else:
+            return {"success": False, "error": f"Download failed: {error_msg}"}
+            
+    except Exception as e:
+        logger.error(f"yt-dlp unexpected error: {str(e)}")
+        return {"success": False, "error": f"Download error: {str(e)}"}
+
+def download_with_alternative(url, download_folder):
+    """
+    Alternative download method as fallback
+    """
+    try:
+        import yt_dlp
+        
+        filename = f"reel_alt_{uuid.uuid4().hex}.mp4"
+        filepath = os.path.join(download_folder, filename)
+        
+        # Simpler configuration for fallback
+        ydl_opts = {
+            'outtmpl': filepath,
+            'format': 'worst[height>=240]',  # Try lower quality
             'quiet': True,
             'no_warnings': True,
+            'retries': 2,
+            'fragment_retries': 2,
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
-            filename = ydl.prepare_filename(info)
-            
-        return {
-            "success": True,
-            "filename": os.path.basename(filename),
-            "filepath": filename,
-            "duration": info.get('duration', 'Unknown'),
-            "thumbnail": info.get('thumbnail', '')
-        }
         
+        if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
+            return {
+                "success": True,
+                "filename": filename,
+                "filepath": filepath,
+                "file_size": os.path.getsize(filepath),
+                "title": info.get('title', 'reel'),
+                "duration": info.get('duration', 'Unknown'),
+            }
+        else:
+            return {"success": False, "error": "Alternative method failed"}
+            
     except Exception as e:
-        logger.error(f"yt-dlp download failed: {str(e)}")
-        raise e
+        logger.error(f"Alternative method error: {str(e)}")
+        return {"success": False, "error": str(e)}
+
+def _progress_hook(d, url):
+    """Progress hook for yt-dlp"""
+    if d['status'] == 'downloading':
+        logger.info(f"Downloading {url}: {d.get('_percent_str', 'Unknown')} - {d.get('_speed_str', 'Unknown')}")
+    elif d['status'] == 'finished':
+        logger.info(f"Finished downloading {url}")
+    elif d['status'] == 'error':
+        logger.error(f"Error downloading {url}: {d.get('error', 'Unknown error')}")
