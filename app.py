@@ -136,8 +136,8 @@ def api_status():
     return jsonify({
         'status': 'active',
         'service': 'Instagram Reel Downloader',
-        'version': '3.0',
-        'method': 'Direct HTML Parsing - 100% WORKING'
+        'version': '4.0',
+        'method': 'Auto Download - 100% WORKING'
     })
 
 if __name__ == '__main__':
