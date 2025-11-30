@@ -6,8 +6,8 @@ import os
 import uuid
 import time
 import threading
-from utils.downloader import download_reel_smart
 import logging
+from utils.downloader import download_reel
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -20,7 +20,7 @@ CORS(app)
 limiter = Limiter(
     get_remote_address,
     app=app,
-    default_limits=["200 per day", "50 per hour"],
+    default_limits=["500 per day", "100 per hour"],
     storage_uri="memory://",
 )
 
@@ -45,7 +45,7 @@ def status():
     })
 
 @app.route('/api/download', methods=['POST'])
-@limiter.limit("10 per minute")
+@limiter.limit("20 per minute")
 def download_reel_endpoint():
     start_time = time.time()
     
@@ -88,8 +88,8 @@ def download_reel_endpoint():
         
         logger.info(f"Download request for: {reel_url}")
         
-        # Download the reel with smart method
-        result = download_reel_smart(reel_url, DOWNLOAD_FOLDER)
+        # Download the reel
+        result = download_reel(reel_url, DOWNLOAD_FOLDER)
         
         processing_time = round(time.time() - start_time, 2)
         
@@ -105,7 +105,6 @@ def download_reel_endpoint():
                 "processing_time": f"{processing_time}s"
             }
             
-            # Add thumbnail if available
             if result.get('thumbnail'):
                 response_data['thumbnail'] = result['thumbnail']
             
@@ -193,6 +192,5 @@ def ratelimit_handler(e):
 
 if __name__ == '__main__':
     logger.info("Starting Reels Downloader API...")
-    # Initial cleanup
     cleanup_old_files()
     app.run(host='0.0.0.0', port=5000, debug=False)
