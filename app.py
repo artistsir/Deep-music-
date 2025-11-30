@@ -1,224 +1,93 @@
 from flask import Flask, request, jsonify, render_template
 import requests
-import re
+import http.client
 import json
-import os
-from urllib.parse import quote
 
 app = Flask(__name__)
 
 class SocialMediaDownloader:
     def __init__(self):
-        self.session = requests.Session()
-        self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        })
+        self.rapidapi_key = "c39530dad2msh8aa5bb904864303p188dbbjsn30e79193a8fc"
     
     def download_instagram(self, url):
-        """Instagram download using WORKING APIs"""
+        """Instagram download using YOUR WORKING RapidAPI"""
         try:
-            # Method 1: Use instadownloader.co (FREE & WORKING)
-            api_url = "https://www.instadownloader.co/fetch"
-            payload = {
-                "url": url
-            }
+            conn = http.client.HTTPSConnection("instagram-reels-downloader-api.p.rapidapi.com")
+            encoded_url = requests.utils.quote(url, safe='')
             
-            headers = {
-                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-                "X-Requested-With": "XMLHttpRequest",
-                "Origin": "https://www.instadownloader.co",
-                "Referer": "https://www.instadownloader.co/",
-            }
+            conn.request("GET", f"/download?url={encoded_url}", headers={
+                'x-rapidapi-key': self.rapidapi_key,
+                'x-rapidapi-host': "instagram-reels-downloader-api.p.rapidapi.com"
+            })
             
-            response = self.session.post(api_url, data=payload, headers=headers, timeout=30)
+            res = conn.getresponse()
+            data = res.read().decode("utf-8")
+            result = json.loads(data)
             
-            if response.status_code == 200:
-                data = response.json()
-                print("InstaDownloader Response:", data)  # Debug
+            print("FULL API RESPONSE:", json.dumps(result, indent=2))
+            
+            if result.get('success') and result.get('data'):
+                data = result['data']
                 
+                # Video URL extract karo
+                video_url = None
+                
+                # Method 1: medias array se video URL lo
                 if data.get('medias') and isinstance(data['medias'], list):
-                    media_urls = []
                     for media in data['medias']:
-                        if media.get('url') and media['url'].startswith('http'):
-                            media_urls.append(media['url'])
-                    
-                    if media_urls:
-                        return {
-                            'success': True,
-                            'platform': 'instagram',
-                            'media_urls': media_urls,
-                            'title': data.get('title', 'Instagram Reel'),
-                            'post_url': url,
-                            'note': 'Click download button to save video'
-                        }
-            
-            # Method 2: Use savefrom.net
-            return self.download_instagram_savefrom(url)
-            
-        except Exception as e:
-            return {'error': f'Instagram error: {str(e)}'}
-    
-    def download_instagram_savefrom(self, url):
-        """Instagram download using savefrom.net"""
-        try:
-            api_url = "https://api.savefrom.net/api/convert"
-            payload = {
-                "url": url
-            }
-            
-            headers = {
-                "Content-Type": "application/json",
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-            }
-            
-            response = self.session.post(api_url, json=payload, headers=headers, timeout=30)
-            
-            if response.status_code == 200:
-                data = response.json()
-                print("SaveFrom Response:", data)  # Debug
+                        if media.get('type') == 'video' and media.get('url'):
+                            video_url = media['url']
+                            break
                 
-                if data.get('url'):
+                # Method 2: Direct URL
+                if not video_url and data.get('url'):
+                    video_url = data['url']
+                
+                if video_url and video_url.startswith('http'):
                     return {
                         'success': True,
                         'platform': 'instagram',
-                        'media_urls': [data['url']],
-                        'post_url': url,
-                        'note': 'Using savefrom.net service'
+                        'media_urls': [video_url],
+                        'title': data.get('title', 'Instagram Reel'),
+                        'author': data.get('author', ''),
+                        'thumbnail': data.get('thumbnail', ''),
+                        'post_url': url
                     }
-                elif data.get('links') and isinstance(data['links'], list):
-                    for link in data['links']:
-                        if link.get('url'):
-                            return {
-                                'success': True,
-                                'platform': 'instagram',
-                                'media_urls': [link['url']],
-                                'post_url': url,
-                                'note': 'Using savefrom.net service'
-                            }
-            
-            # Method 3: Use online downloader
-            return self.download_instagram_direct(url)
-            
-        except Exception as e:
-            return {'error': f'SaveFrom error: {str(e)}'}
-    
-    def download_instagram_direct(self, url):
-        """Direct Instagram download using web service"""
-        try:
-            # Use snapinsta.app
-            encoded_url = quote(url)
-            api_url = f"https://snapinsta.app/api/ajaxSearch"
-            
-            payload = f"q={encoded_url}&t=media&lang=en"
-            
-            headers = {
-                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-                "X-Requested-With": "XMLHttpRequest",
-                "Origin": "https://snapinsta.app",
-                "Referer": "https://snapinsta.app/",
-            }
-            
-            response = self.session.post(api_url, data=payload, headers=headers, timeout=30)
-            
-            if response.status_code == 200:
-                data = response.json()
-                print("SnapInsta Response:", data)  # Debug
+                else:
+                    return {'error': 'No video URL found in response'}
+            else:
+                return {'error': result.get('message', 'API request failed')}
                 
-                if data.get('data'):
-                    # Extract download link from HTML response
-                    html = data['data']
-                    # Look for video download links
-                    video_patterns = [
-                        r'href="(https://[^"]*\.mp4[^"]*)"',
-                        r'download_url":"([^"]+)"',
-                        r'data-video="([^"]+)"'
-                    ]
-                    
-                    for pattern in video_patterns:
-                        matches = re.findall(pattern, html)
-                        for match in matches:
-                            video_url = match.replace('\\u0026', '&')
-                            if video_url.startswith('http'):
-                                return {
-                                    'success': True,
-                                    'platform': 'instagram',
-                                    'media_urls': [video_url],
-                                    'post_url': url,
-                                    'note': 'Using snapinsta.app service'
-                                }
-            
-            return {'error': 'All Instagram download methods failed. Try another URL.'}
-            
         except Exception as e:
-            return {'error': f'Direct download error: {str(e)}'}
+            return {'error': f'Instagram API error: {str(e)}'}
     
     def download_tiktok(self, url):
-        """TikTok download - MOST RELIABLE"""
+        """TikTok download"""
         try:
-            # Use tikdown.org API
-            api_url = "https://tikdown.org/api/ajaxSearch"
-            payload = {
-                "url": url,
-            }
-            
+            api_url = "https://tiktok-downloader-download-tiktok-videos-without-watermark.p.rapidapi.com/vid/index"
+            params = {"url": url}
             headers = {
-                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-                "X-Requested-With": "XMLHttpRequest",
-                "Origin": "https://tikdown.org",
-                "Referer": "https://tikdown.org/",
+                "x-rapidapi-key": self.rapidapi_key,
+                "x-rapidapi-host": "tiktok-downloader-download-tiktok-videos-without-watermark.p.rapidapi.com"
             }
             
-            response = self.session.post(api_url, data=payload, headers=headers, timeout=30)
+            response = requests.get(api_url, params=params, headers=headers, timeout=30)
             
             if response.status_code == 200:
                 data = response.json()
-                if data.get('data'):
-                    # Extract download link from HTML response
-                    html = data['data']
-                    download_match = re.search(r'href="(https:[^"]*\.mp4[^"]*)"', html)
-                    if download_match:
-                        return {
-                            'success': True,
-                            'platform': 'tiktok',
-                            'media_urls': [download_match.group(1)],
-                            'post_url': url
-                        }
-            
-            # Alternative method
-            return self.download_tiktok_alternative(url)
-            
-        except Exception as e:
-            return {'error': f'TikTok error: {str(e)}'}
-    
-    def download_tiktok_alternative(self, url):
-        """Alternative TikTok download"""
-        try:
-            api_url = "https://www.tikwm.com/api/"
-            payload = {
-                "url": url
-            }
-            
-            response = self.session.post(api_url, json=payload, timeout=30)
-            
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('data') and data['data'].get('play'):
-                    video_url = data['data']['play']
-                    if not video_url.startswith('http'):
-                        video_url = 'https:' + video_url
-                    
+                if data.get('video'):
                     return {
                         'success': True,
                         'platform': 'tiktok',
-                        'media_urls': [video_url],
-                        'title': data['data'].get('title', 'TikTok Video'),
+                        'media_urls': [data['video'][0]],
+                        'title': data.get('title', 'TikTok Video'),
                         'post_url': url
                     }
             
-            return {'error': 'TikTok download service busy. Try again.'}
+            return {'error': 'TikTok download failed'}
             
         except Exception as e:
-            return {'error': f'TikTok alternative error: {str(e)}'}
+            return {'error': f'TikTok error: {str(e)}'}
     
     def download_media(self, url):
         """Main download function"""
@@ -227,7 +96,7 @@ class SocialMediaDownloader:
         elif 'tiktok.com' in url:
             return self.download_tiktok(url)
         else:
-            return {'error': 'Unsupported platform. Use Instagram or TikTok.'}
+            return {'error': 'Unsupported platform'}
 
 downloader = SocialMediaDownloader()
 
@@ -254,17 +123,9 @@ def api_status():
     return jsonify({
         'status': 'active',
         'service': 'Social Media Downloader',
-        'version': '9.0',
-        'supported_platforms': ['Instagram', 'TikTok'],
-        'note': 'Using FREE working APIs - No RapidAPI'
+        'version': '1.0',
+        'supported_platforms': ['Instagram', 'TikTok']
     })
-
-@app.route('/api/test-instagram')
-def test_instagram():
-    """Test endpoint for Instagram"""
-    test_url = "https://www.instagram.com/reel/DRopk8PEXPn/"
-    result = downloader.download_instagram(test_url)
-    return jsonify(result)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
