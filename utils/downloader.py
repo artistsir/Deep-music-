@@ -2,7 +2,6 @@ import os
 import uuid
 import time
 import logging
-import random
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
@@ -14,7 +13,7 @@ def download_reel_with_cookies(url, download_folder, cookies_folder):
     try:
         import yt_dlp
         
-        logger.info(f"Attempting download with cookies: {url}")
+        logger.info(f"Attempting download: {url}")
         
         filename = f"reel_{uuid.uuid4().hex}.mp4"
         filepath = os.path.join(download_folder, filename)
@@ -25,7 +24,10 @@ def download_reel_with_cookies(url, download_folder, cookies_folder):
         # Advanced yt-dlp configuration with cookie support
         ydl_opts = build_ydl_options(filepath, cookies_file)
         
-        logger.info(f"Using cookies: {cookies_file}")
+        if cookies_file:
+            logger.info(f"Using cookies file: {cookies_file}")
+        else:
+            logger.info("No cookies file found, attempting without cookies")
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             try:
@@ -33,11 +35,7 @@ def download_reel_with_cookies(url, download_folder, cookies_folder):
                 info = ydl.extract_info(url, download=False)
                 
                 if not info:
-                    return {
-                        "success": False, 
-                        "error": "Could not extract video information",
-                        "solution": "The reel might be private or unavailable"
-                    }
+                    return try_alternative_methods(url, download_folder)
                 
                 logger.info(f"Video info extracted: {info.get('title', 'Unknown')}")
                 
@@ -62,7 +60,7 @@ def download_reel_with_cookies(url, download_folder, cookies_folder):
                     os.rename(actual_filepath, final_filepath)
                 
                 # Verify download
-                if os.path.exists(final_filepath) and os.path.getsize(final_filepath) > 1024:  # At least 1KB
+                if os.path.exists(final_filepath) and os.path.getsize(final_filepath) > 1024:
                     file_size = os.path.getsize(final_filepath)
                     
                     return {
@@ -70,17 +68,17 @@ def download_reel_with_cookies(url, download_folder, cookies_folder):
                         "filename": filename,
                         "filepath": final_filepath,
                         "file_size": file_size,
-                        "title": info.get('title', 'reel'),
+                        "title": clean_title(info.get('title', 'reel')),
                         "duration": format_duration(info.get('duration')),
                         "thumbnail": info.get('thumbnail'),
                         "quality": info.get('format_note', 'HD'),
-                        "message": "Download completed with cookie authentication"
+                        "message": "Download completed successfully"
                     }
                 else:
                     return {
                         "success": False,
                         "error": "Downloaded file is empty or too small",
-                        "solution": "The cookies might be invalid or expired"
+                        "solution": "The content might be restricted or cookies expired"
                     }
                     
             except yt_dlp.utils.DownloadError as e:
@@ -91,11 +89,7 @@ def download_reel_with_cookies(url, download_folder, cookies_folder):
                 
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
-        return {
-            "success": False,
-            "error": f"Download failed: {str(e)}",
-            "solution": "Try again later or contact support"
-        }
+        return try_alternative_methods(url, download_folder)
 
 def build_ydl_options(filepath, cookies_file):
     """Build optimized yt-dlp options with cookie support"""
@@ -107,34 +101,32 @@ def build_ydl_options(filepath, cookies_file):
         'Accept-Language': 'en-US,en;q=0.9',
         'Accept-Encoding': 'gzip, deflate, br',
         'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
+        'Referer': 'https://www.instagram.com/',
+        'Origin': 'https://www.instagram.com',
     }
     
     ydl_opts = {
         # Output
-        'outtmpl': filepath.replace('.mp4', '') + '.%(ext)s',
+        'outtmpl': filepath.replace('.mp4', ''),
         
-        # Format selection
-        'format': 'best[height<=1080]/best[ext=mp4]/best',
-        'format_sort': ['res:1080', 'ext:mp4', 'acodec:mp4a'],
+        # Format selection - SIMPLIFIED to avoid conflicts
+        'format': 'best',
         
-        # Cookies
+        # Cookies - ONLY use cookiefile, remove browser cookies
         'cookiefile': cookies_file,
-        'cookiesfrombrowser': get_browser_cookies_config(),
         
         # Download settings
-        'retries': 20,
-        'fragment_retries': 20,
+        'retries': 10,
+        'fragment_retries': 10,
         'skip_unavailable_fragments': True,
         'continue_dl': True,
         
         # Timeouts
-        'socket_timeout': 60,
-        'retry_sleep': 2,
+        'socket_timeout': 30,
+        'retry_sleep': 1,
         
         # Rate limiting
-        'ratelimit': 1500000,
-        'throttledratelimit': 3000000,
+        'ratelimit': 2000000,
         
         # Headers
         'http_headers': headers,
@@ -143,36 +135,169 @@ def build_ydl_options(filepath, cookies_file):
         'extractor_args': {
             'instagram': {
                 'format': 'best',
-                'feed': {'endpoints': False},
-                'client': {'endpoints': False},
-                'cookies': {'required': True},
             },
             'facebook': {
                 'format': 'best',
-                'cookies': {'required': True},
             }
         },
         
         # Verbosity
-        'quiet': False,
+        'quiet': True,
         'no_warnings': False,
         
         # Progress hooks
         'progress_hooks': [lambda d: progress_hook(d)],
         
-        # Post-processing
+        # Post-processing - removed problematic options
         'postprocessors': [],
     }
     
+    # Platform-specific optimizations
+    if 'instagram.com' in url:
+        ydl_opts['http_headers'].update({
+            'Referer': 'https://www.instagram.com/',
+            'Origin': 'https://www.instagram.com',
+            'X-IG-App-ID': '936619743392459',
+        })
+    elif 'facebook.com' in url:
+        ydl_opts['http_headers'].update({
+            'Referer': 'https://www.facebook.com/',
+            'Origin': 'https://www.facebook.com',
+        })
+    
     return ydl_opts
 
-def get_browser_cookies_config():
-    """Configuration for browser cookies fallback"""
+def try_alternative_methods(url, download_folder):
+    """Try alternative download methods when main method fails"""
+    logger.info("Trying alternative download methods...")
+    
+    # Method 1: Simple download without cookies
+    result = simple_download(url, download_folder)
+    if result['success']:
+        return result
+    
+    # Method 2: Try with different format selection
+    result = alternative_format_download(url, download_folder)
+    if result['success']:
+        return result
+    
+    # Method 3: Last resort - minimal configuration
+    result = minimal_download(url, download_folder)
+    if result['success']:
+        return result
+    
     return {
-        'chrome': None,  # Auto-detect Chrome
-        'firefox': None, # Auto-detect Firefox
-        'edge': None,    # Auto-detect Edge
+        "success": False,
+        "error": "All download methods failed",
+        "solution": "The reel might be private, geo-restricted, or unavailable. Try uploading cookies for private accounts."
     }
+
+def simple_download(url, download_folder):
+    """Simple download method with minimal configuration"""
+    try:
+        import yt_dlp
+        
+        filename = f"reel_simple_{uuid.uuid4().hex}.mp4"
+        filepath = os.path.join(download_folder, filename)
+        
+        ydl_opts = {
+            'outtmpl': filepath,
+            'format': 'best[height<=720]',
+            'quiet': True,
+            'retries': 3,
+        }
+        
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+        
+        if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
+            return {
+                "success": True,
+                "filename": filename,
+                "file_size": os.path.getsize(filepath),
+                "title": clean_title(info.get('title', 'reel')),
+                "duration": format_duration(info.get('duration')),
+            }
+        else:
+            return {"success": False}
+            
+    except Exception as e:
+        logger.error(f"Simple download failed: {str(e)}")
+        return {"success": False}
+
+def alternative_format_download(url, download_folder):
+    """Try with different format selection"""
+    try:
+        import yt_dlp
+        
+        filename = f"reel_alt_{uuid.uuid4().hex}.mp4"
+        filepath = os.path.join(download_folder, filename)
+        
+        # Try different format combinations
+        format_preferences = [
+            'best[ext=mp4]',
+            'worst[height>=240]',
+            'best[height<=480]',
+            'best'
+        ]
+        
+        for format_str in format_preferences:
+            try:
+                ydl_opts = {
+                    'outtmpl': filepath,
+                    'format': format_str,
+                    'quiet': True,
+                    'retries': 2,
+                }
+                
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(url, download=True)
+                
+                if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
+                    return {
+                        "success": True,
+                        "filename": filename,
+                        "file_size": os.path.getsize(filepath),
+                        "title": clean_title(info.get('title', 'reel')),
+                        "duration": format_duration(info.get('duration')),
+                    }
+                    
+            except Exception as e:
+                continue
+                
+        return {"success": False}
+        
+    except Exception as e:
+        return {"success": False}
+
+def minimal_download(url, download_folder):
+    """Minimal configuration download as last resort"""
+    try:
+        import yt_dlp
+        
+        filename = f"reel_min_{uuid.uuid4().hex}.mp4"
+        filepath = os.path.join(download_folder, filename)
+        
+        ydl_opts = {
+            'outtmpl': filepath,
+            'quiet': True,
+        }
+        
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+        
+        if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
+            return {
+                "success": True,
+                "filename": filename,
+                "file_size": os.path.getsize(filepath),
+                "title": clean_title(info.get('title', 'reel')),
+            }
+        else:
+            return {"success": False}
+            
+    except Exception as e:
+        return {"success": False}
 
 def find_best_cookies(cookies_folder, url):
     """Find the best cookies file for the given URL"""
@@ -184,9 +309,7 @@ def find_best_cookies(cookies_folder, url):
             if file.endswith('.txt'):
                 cookies_files.append(os.path.join(cookies_folder, file))
         
-        # If no cookies files, return None (yt-dlp will try browser cookies)
         if not cookies_files:
-            logger.info("No cookies files found, using browser cookies")
             return None
         
         # Prioritize platform-specific cookies
@@ -201,9 +324,7 @@ def find_best_cookies(cookies_folder, url):
                     return cookie_file
         
         # Return the most recent cookies file
-        most_recent = max(cookies_files, key=os.path.getctime)
-        logger.info(f"Using most recent cookies: {most_recent}")
-        return most_recent
+        return max(cookies_files, key=os.path.getctime)
         
     except Exception as e:
         logger.error(f"Error finding cookies: {str(e)}")
@@ -218,7 +339,7 @@ def handle_download_error(error_msg, cookies_file):
         return {
             "success": False,
             "error": "Login required - Private account or content",
-            "solution": f"Upload valid cookies file. Current cookies: {cookies_file}"
+            "solution": "Upload valid cookies file to download private reels"
         }
     
     elif 'age restriction' in error_lower:
@@ -239,7 +360,7 @@ def handle_download_error(error_msg, cookies_file):
         return {
             "success": False,
             "error": "Invalid or expired cookies",
-            "solution": "Upload fresh cookies file or try browser authentication"
+            "solution": "Upload fresh cookies file"
         }
     
     elif 'rate limit' in error_lower:
@@ -249,11 +370,18 @@ def handle_download_error(error_msg, cookies_file):
             "solution": "Wait a few minutes and try again"
         }
     
+    elif 'unsupported' in error_lower or 'keyring' in error_lower:
+        return {
+            "success": False,
+            "error": "Configuration error",
+            "solution": "Trying alternative download methods..."
+        }
+    
     else:
         return {
             "success": False,
             "error": f"Download failed: {error_msg}",
-            "solution": "Try again with different cookies or contact support"
+            "solution": "Trying alternative methods..."
         }
 
 def find_downloaded_file(temp_path, download_folder):
@@ -269,17 +397,16 @@ def find_downloaded_file(temp_path, download_folder):
             if file.startswith(base_name):
                 return os.path.join(download_folder, file)
         
-        # Look for recent MP4 files
+        # Look for recent video files
         recent_files = []
         for file in os.listdir(download_folder):
-            if file.endswith(('.mp4', '.webm', '.mkv')):
+            if file.endswith(('.mp4', '.webm', '.mkv', '.m4a')):
                 file_path = os.path.join(download_folder, file)
-                if time.time() - os.path.getmtime(file_path) < 300:  # 5 minutes
-                    recent_files.append((file_path, os.path.getmtime(file_path)))
+                if time.time() - os.path.getmtime(file_path) < 300:
+                    recent_files.append(file_path)
         
         if recent_files:
-            # Return the most recent file
-            return max(recent_files, key=lambda x: x[1])[0]
+            return recent_files[0]
         
         return None
         
@@ -293,13 +420,11 @@ def progress_hook(d):
         if d['status'] == 'downloading':
             percent = d.get('_percent_str', 'Unknown')
             speed = d.get('_speed_str', 'Unknown')
-            logger.info(f"Download progress: {percent} at {speed}")
+            logger.info(f"Progress: {percent} at {speed}")
         elif d['status'] == 'finished':
-            logger.info("Download finished successfully")
-        elif d['status'] == 'error':
-            logger.error(f"Download error: {d.get('error', 'Unknown')}")
-    except Exception as e:
-        logger.error(f"Progress hook error: {str(e)}")
+            logger.info("Download finished")
+    except Exception:
+        pass
 
 def format_duration(seconds):
     """Format duration in seconds to readable format"""
@@ -316,9 +441,21 @@ def format_duration(seconds):
     else:
         return f"{seconds}s"
 
-# Alternative method without cookies (for public reels)
+def clean_title(title):
+    """Clean video title from special characters"""
+    if not title:
+        return 'reel'
+    
+    # Remove special characters and limit length
+    import re
+    title = re.sub(r'[^\w\s-]', '', title)
+    title = title.strip()[:50]
+    
+    return title if title else 'reel'
+
+# Direct public download function
 def download_public_reel(url, download_folder):
-    """Download public reels without cookies"""
+    """Direct public reel download without cookies"""
     try:
         import yt_dlp
         
@@ -329,15 +466,23 @@ def download_public_reel(url, download_folder):
             'outtmpl': filepath,
             'format': 'best[height<=720]',
             'quiet': True,
+            'retries': 5,
+            'socket_timeout': 30,
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
         
         if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
-            return {"success": True, "filename": filename}
+            return {
+                "success": True,
+                "filename": filename,
+                "file_size": os.path.getsize(filepath),
+                "title": clean_title(info.get('title', 'reel')),
+                "duration": format_duration(info.get('duration')),
+            }
         else:
-            return {"success": False, "error": "Public download failed"}
+            return {"success": False, "error": "Download failed"}
             
     except Exception as e:
         return {"success": False, "error": str(e)}
