@@ -1,9 +1,8 @@
 from flask import Flask, request, jsonify, render_template
 import requests
-import re
-import json
 import os
-from urllib.parse import unquote
+import http.client
+import json
 
 app = Flask(__name__)
 
@@ -11,216 +10,157 @@ class SocialMediaDownloader:
     def __init__(self):
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'Accept-Encoding': 'gzip, deflate',
-            'Connection': 'keep-alive',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         })
+        # Your RapidAPI Key
+        self.rapidapi_key = "c39530dad2msh8aa5bb904864303p188dbbjsn30e79193a8fc"
     
     def download_instagram(self, url):
-        """Instagram download using FREE methods"""
+        """Instagram download using YOUR WORKING RapidAPI"""
         try:
-            # Method 1: Use instadownloader.co
-            api_url = "https://www.instadownloader.co/fetch"
-            payload = {
-                "url": url
-            }
+            # Use the exact API you provided
+            conn = http.client.HTTPSConnection("instagram-reels-downloader-api.p.rapidapi.com")
             
-            response = self.session.post(api_url, data=payload, timeout=30)
+            # URL encode the Instagram URL
+            encoded_url = requests.utils.quote(url, safe='')
             
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('medias'):
-                    media_urls = []
-                    for media in data['medias']:
-                        if media.get('url'):
-                            media_urls.append(media['url'])
-                    
-                    if media_urls:
-                        return {
-                            'success': True,
-                            'platform': 'instagram',
-                            'media_urls': media_urls,
-                            'post_url': url,
-                            'note': 'Click download button to save media'
-                        }
+            # Make the API request
+            conn.request("GET", f"/download?url={encoded_url}", headers={
+                'x-rapidapi-key': self.rapidapi_key,
+                'x-rapidapi-host': "instagram-reels-downloader-api.p.rapidapi.com"
+            })
             
-            # Method 2: Use savefrom.net
-            return self.download_instagram_savefrom(url)
+            res = conn.getresponse()
+            data = res.read().decode("utf-8")
             
-        except Exception as e:
-            return {'error': f'Instagram error: {str(e)}'}
-    
-    def download_instagram_savefrom(self, url):
-        """Instagram download using savefrom.net"""
-        try:
-            api_url = "https://api.savefrom.net/service/convert"
-            payload = {
-                "url": url
-            }
+            # Parse the response
+            result = json.loads(data)
             
-            response = self.session.post(api_url, json=payload, timeout=30)
-            
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('url'):
+            if result.get('success') and result.get('data'):
+                video_url = result['data'].get('url')
+                if video_url:
                     return {
                         'success': True,
                         'platform': 'instagram',
-                        'media_urls': [data['url']],
+                        'media_urls': [video_url],
+                        'title': result['data'].get('title', 'Instagram Reel'),
                         'post_url': url
                     }
-            
-            # Method 3: Direct HTML parsing
-            return self.download_instagram_direct(url)
-            
+            else:
+                return {'error': result.get('message', 'Instagram download failed')}
+                
         except Exception as e:
-            return {'error': f'Instagram savefrom error: {str(e)}'}
+            return {'error': f'Instagram API error: {str(e)}'}
     
-    def download_instagram_direct(self, url):
-        """Direct Instagram download using HTML parsing"""
+    def download_instagram_alternative(self, url):
+        """Alternative method if main API fails"""
         try:
-            # Add ?__a=1 to get JSON data
-            json_url = url + "?__a=1&__d=dis"
-            
+            # Alternative free method
+            api_url = "https://insta-downloader-youtube.p.rapidapi.com/index"
+            params = {
+                "url": url
+            }
             headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Accept': 'application/json',
-                'Referer': 'https://www.instagram.com/',
+                "x-rapidapi-key": self.rapidapi_key,
+                "x-rapidapi-host": "insta-downloader-youtube.p.rapidapi.com"
             }
             
-            response = self.session.get(json_url, headers=headers, timeout=30)
+            response = self.session.get(api_url, params=params, headers=headers, timeout=30)
             
             if response.status_code == 200:
                 data = response.json()
-                
-                # Extract media from JSON response
-                media_urls = []
-                
-                # For single image/video posts
-                if 'graphql' in data:
-                    post = data['graphql']['shortcode_media']
-                    if post['is_video']:
-                        media_urls.append(post['video_url'])
-                    else:
-                        media_urls.append(post['display_url'])
-                
-                # For carousel posts
-                elif 'items' in data:
-                    for item in data['items']:
-                        if 'video_versions' in item:
-                            media_urls.append(item['video_versions'][0]['url'])
-                        elif 'image_versions2' in item:
-                            media_urls.append(item['image_versions2']['candidates'][0]['url'])
-                
-                if media_urls:
+                if data.get('media'):
                     return {
                         'success': True,
                         'platform': 'instagram',
-                        'media_urls': media_urls,
+                        'media_urls': [data['media']],
                         'post_url': url
                     }
             
-            return {'error': 'Could not download this Instagram post. Try another URL.'}
+            return {'error': 'Instagram download not available'}
             
         except Exception as e:
-            return {'error': f'Instagram direct error: {str(e)}'}
+            return {'error': f'Instagram alternative error: {str(e)}'}
     
     def download_tiktok(self, url):
-        """TikTok download - MOST RELIABLE"""
+        """TikTok download"""
         try:
-            # Use tikdown.org API
-            api_url = "https://tikdown.org/api/ajaxSearch"
-            payload = {
-                "url": url,
+            api_url = "https://tiktok-downloader-download-tiktok-videos-without-watermark.p.rapidapi.com/vid/index"
+            params = {
+                "url": url
             }
-            
             headers = {
-                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-                "X-Requested-With": "XMLHttpRequest",
-                "Origin": "https://tikdown.org",
-                "Referer": "https://tikdown.org/",
+                "x-rapidapi-key": self.rapidapi_key,
+                "x-rapidapi-host": "tiktok-downloader-download-tiktok-videos-without-watermark.p.rapidapi.com"
             }
             
-            response = self.session.post(api_url, data=payload, headers=headers, timeout=30)
+            response = self.session.get(api_url, params=params, headers=headers, timeout=30)
             
             if response.status_code == 200:
                 data = response.json()
-                if data.get('data'):
-                    # Extract download link from HTML response
-                    html = data['data']
-                    download_match = re.search(r'href="(https:[^"]*\.mp4[^"]*)"', html)
-                    if download_match:
-                        return {
-                            'success': True,
-                            'platform': 'tiktok',
-                            'media_urls': [download_match.group(1)],
-                            'post_url': url
-                        }
+                if data.get('video'):
+                    return {
+                        'success': True,
+                        'platform': 'tiktok',
+                        'media_urls': [data['video'][0]],
+                        'title': data.get('title', 'TikTok Video'),
+                        'post_url': url
+                    }
+                elif data.get('wmplay'):
+                    return {
+                        'success': True,
+                        'platform': 'tiktok',
+                        'media_urls': [data['wmplay']],
+                        'post_url': url
+                    }
             
-            # Alternative method
-            return self.download_tiktok_alternative(url)
+            return {'error': 'TikTok download failed'}
             
         except Exception as e:
             return {'error': f'TikTok error: {str(e)}'}
     
-    def download_tiktok_alternative(self, url):
-        """Alternative TikTok download"""
-        try:
-            api_url = "https://www.tikwm.com/api/"
-            payload = {
-                "url": url
-            }
-            
-            response = self.session.post(api_url, json=payload, timeout=30)
-            
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('data') and data['data'].get('play'):
-                    video_url = data['data']['play']
-                    if not video_url.startswith('http'):
-                        video_url = 'https:' + video_url
-                    
-                    return {
-                        'success': True,
-                        'platform': 'tiktok',
-                        'media_urls': [video_url],
-                        'title': data['data'].get('title', 'TikTok Video'),
-                        'post_url': url
-                    }
-            
-            return {'error': 'TikTok download service busy. Try again.'}
-            
-        except Exception as e:
-            return {'error': f'TikTok alternative error: {str(e)}'}
-    
     def download_youtube(self, url):
-        """YouTube download using free services"""
+        """YouTube download using RapidAPI"""
         try:
-            # Use y2mate.guru API
-            api_url = "https://api.y2mate.guru/api/convert"
-            payload = {
-                "url": url
+            api_url = "https://youtube-media-downloader.p.rapidapi.com/v2/video/details"
+            params = {
+                "videoId": self.extract_youtube_id(url)
+            }
+            headers = {
+                "x-rapidapi-key": self.rapidapi_key,
+                "x-rapidapi-host": "youtube-media-downloader.p.rapidapi.com"
             }
             
-            response = self.session.post(api_url, json=payload, timeout=30)
+            response = self.session.get(api_url, params=params, headers=headers, timeout=30)
             
             if response.status_code == 200:
                 data = response.json()
-                if data.get('url'):
-                    return {
-                        'success': True,
-                        'platform': 'youtube',
-                        'media_urls': [data['url']],
-                        'title': data.get('title', 'YouTube Video'),
-                        'post_url': url
-                    }
+                if data.get('videos'):
+                    # Get the highest quality video
+                    videos = data['videos']['items']
+                    if videos:
+                        best_quality = max(videos, key=lambda x: x.get('quality', 0))
+                        return {
+                            'success': True,
+                            'platform': 'youtube',
+                            'media_urls': [best_quality['url']],
+                            'title': data.get('title', 'YouTube Video'),
+                            'post_url': url
+                        }
             
-            return {'error': 'YouTube service temporarily unavailable'}
+            return {'error': 'YouTube download failed'}
             
         except Exception as e:
             return {'error': f'YouTube error: {str(e)}'}
+    
+    def extract_youtube_id(self, url):
+        """Extract YouTube video ID from URL"""
+        if 'youtu.be/' in url:
+            return url.split('youtu.be/')[1].split('?')[0]
+        elif 'youtube.com/watch?v=' in url:
+            return url.split('v=')[1].split('&')[0]
+        else:
+            return url
     
     def download_media(self, url):
         """Main download function"""
@@ -258,10 +198,17 @@ def api_status():
     return jsonify({
         'status': 'active',
         'service': 'Social Media Downloader',
-        'version': '6.0',
+        'version': '7.0',
         'supported_platforms': ['Instagram', 'TikTok', 'YouTube'],
-        'note': 'Using free APIs - no RapidAPI key required'
+        'note': 'Using RapidAPI - PROPER WORKING'
     })
+
+@app.route('/test-instagram')
+def test_instagram():
+    """Test Instagram download with your API"""
+    test_url = "https://www.instagram.com/reel/DJg8Hc_zkot/"
+    result = downloader.download_instagram(test_url)
+    return jsonify(result)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
