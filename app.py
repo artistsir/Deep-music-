@@ -91,13 +91,21 @@ downloader = SocialMediaDownloader()
 def home():
     return render_template('index.html')
 
-@app.route('/api/download', methods=['POST'])
+# UPDATE THIS ROUTE - ADD GET METHOD
+@app.route('/api/download', methods=['POST', 'GET'])  # GET ADD KARO
 def download_media():
-    data = request.get_json()
-    if not data or 'url' not in data:
-        return jsonify({'error': 'URL is required'}), 400
+    # GET request handle karo
+    if request.method == 'GET':
+        url = request.args.get('url')
+        if not url:
+            return jsonify({'error': 'URL parameter is required'}), 400
+    # POST request handle karo  
+    else:
+        data = request.get_json()
+        if not data or 'url' not in data:
+            return jsonify({'error': 'URL is required'}), 400
+        url = data['url']
     
-    url = data['url']
     result = downloader.download_media(url)
     return jsonify(result)
 
@@ -108,6 +116,11 @@ def api_status():
         'service': 'Social Media Downloader',
         'version': '1.0'
     })
+
+# Test route add karo
+@app.route('/test')
+def test():
+    return jsonify({'message': 'API is working!'})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
