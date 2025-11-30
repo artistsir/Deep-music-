@@ -56,7 +56,7 @@ class SocialMediaDownloader:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
                 formats = []
-                for f in info['formats'][:5]:  # Limit to 5 formats
+                for f in info['formats'][:5]:
                     if f.get('url'):
                         formats.append({
                             'format': f.get('format_note', 'unknown'),
