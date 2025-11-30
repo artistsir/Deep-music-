@@ -7,7 +7,7 @@ import uuid
 import time
 import threading
 import logging
-from utils.downloader import download_reel_with_cookies
+from utils.downloader import download_reel_with_cookies, download_public_reel
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -20,7 +20,7 @@ CORS(app)
 limiter = Limiter(
     get_remote_address,
     app=app,
-    default_limits=["1000 per day", "200 per hour"],
+    default_limits=["500 per day", "50 per hour"],
     storage_uri="memory://",
 )
 
@@ -42,12 +42,12 @@ def home():
 def status():
     return jsonify({
         "status": "active", 
-        "message": "Reels Downloader with Cookie Support",
+        "message": "Reels Downloader - Fixed Version",
         "timestamp": time.time()
     })
 
 @app.route('/api/download', methods=['POST'])
-@limiter.limit("30 per minute")
+@limiter.limit("20 per minute")
 def download_reel_endpoint():
     start_time = time.time()
     
@@ -57,7 +57,7 @@ def download_reel_endpoint():
         if not data or 'url' not in data:
             return jsonify({
                 "success": False,
-                "error": "URL is required in JSON format"
+                "error": "URL is required"
             }), 400
         
         reel_url = data['url'].strip()
@@ -68,23 +68,21 @@ def download_reel_endpoint():
                 "error": "URL cannot be empty"
             }), 400
         
-        # Validate URL
-        if not (reel_url.startswith('http://') or reel_url.startswith('https://')):
-            return jsonify({
-                "success": False,
-                "error": "Invalid URL format"
-            }), 400
-        
         if not any(domain in reel_url for domain in ['instagram.com', 'facebook.com', 'fb.watch']):
             return jsonify({
                 "success": False,
-                "error": "Unsupported platform. Supported: Instagram, Facebook"
+                "error": "Please provide Instagram or Facebook URL"
             }), 400
         
-        logger.info(f"Download request for: {reel_url}")
+        logger.info(f"Download request: {reel_url}")
         
-        # Use cookies for download
-        result = download_reel_with_cookies(reel_url, DOWNLOAD_FOLDER, COOKIES_FOLDER)
+        # Try download with cookies first, then fallback to public
+        use_cookies = data.get('use_cookies', True)
+        
+        if use_cookies:
+            result = download_reel_with_cookies(reel_url, DOWNLOAD_FOLDER, COOKIES_FOLDER)
+        else:
+            result = download_public_reel(reel_url, DOWNLOAD_FOLDER)
         
         processing_time = round(time.time() - start_time, 2)
         
@@ -97,27 +95,23 @@ def download_reel_endpoint():
                 "file_size": result.get('file_size', 0),
                 "title": result.get('title', 'reel'),
                 "duration": result.get('duration', 'Unknown'),
-                "processing_time": f"{processing_time}s",
-                "quality": result.get('quality', 'HD')
+                "processing_time": f"{processing_time}s"
             }
-            
-            if result.get('thumbnail'):
-                response_data['thumbnail'] = result['thumbnail']
             
             return jsonify(response_data)
         else:
             return jsonify({
                 "success": False,
-                "error": result['error'],
-                "processing_time": f"{processing_time}s",
-                "solution": result.get('solution', 'Try another reel or use cookies')
+                "error": result.get('error', 'Download failed'),
+                "solution": result.get('solution', 'Try another reel'),
+                "processing_time": f"{processing_time}s"
             }), 500
             
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
         return jsonify({
             "success": False,
-            "error": f"Internal server error: {str(e)}"
+            "error": "Internal server error"
         }), 500
 
 @app.route('/api/file/<filename>')
@@ -139,12 +133,11 @@ def serve_file(filename):
         return send_file(file_path, as_attachment=True, download_name=filename)
         
     except Exception as e:
-        logger.error(f"File serving error: {str(e)}")
         return jsonify({"error": "Error serving file"}), 500
 
 @app.route('/api/upload-cookies', methods=['POST'])
 def upload_cookies():
-    """Endpoint to upload cookies file"""
+    """Upload cookies file"""
     try:
         if 'cookies_file' not in request.files:
             return jsonify({"success": False, "error": "No file uploaded"}), 400
@@ -158,13 +151,18 @@ def upload_cookies():
             filepath = os.path.join(COOKIES_FOLDER, filename)
             file.save(filepath)
             
-            return jsonify({
-                "success": True,
-                "message": "Cookies file uploaded successfully",
-                "filename": filename
-            })
+            # Verify file has content
+            if os.path.getsize(filepath) > 0:
+                return jsonify({
+                    "success": True,
+                    "message": "Cookies uploaded successfully",
+                    "filename": filename
+                })
+            else:
+                os.remove(filepath)
+                return jsonify({"success": False, "error": "File is empty"}), 400
         else:
-            return jsonify({"success": False, "error": "Only .txt files are supported"}), 400
+            return jsonify({"success": False, "error": "Only .txt files supported"}), 400
             
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -192,15 +190,15 @@ def cleanup_old_files():
 def background_cleanup():
     """Background cleanup thread"""
     while True:
-        time.sleep(300)  # 5 minutes
+        time.sleep(300)
         try:
             deleted = cleanup_old_files()
             if deleted > 0:
-                logger.info(f"Cleanup deleted {deleted} files")
+                logger.info(f"Cleaned up {deleted} files")
         except Exception as e:
             logger.error(f"Cleanup error: {str(e)}")
 
-# Start background cleanup
+# Start cleanup thread
 cleanup_thread = threading.Thread(target=background_cleanup, daemon=True)
 cleanup_thread.start()
 
@@ -208,10 +206,10 @@ cleanup_thread.start()
 def ratelimit_handler(e):
     return jsonify({
         "success": False,
-        "error": "Too many requests. Please wait a few minutes."
+        "error": "Too many requests. Please wait a minute."
     }), 429
 
 if __name__ == '__main__':
-    logger.info("Starting Reels Downloader with Cookie Support...")
+    logger.info("Starting Fixed Reels Downloader...")
     cleanup_old_files()
     app.run(host='0.0.0.0', port=5000, debug=False)
