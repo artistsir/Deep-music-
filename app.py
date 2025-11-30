@@ -1,86 +1,149 @@
 from flask import Flask, request, jsonify, render_template
 import requests
-import http.client
+import re
+import os
+from urllib.parse import urlparse, urlunparse
 import json
 
 app = Flask(__name__)
 
-class SocialMediaDownloader:
+class InstagramDownloader:
     def __init__(self):
-        self.rapidapi_key = "c39530dad2msh8aa5bb904864303p188dbbjsn30e79193a8fc"
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Cache-Control': 'max-age=0',
+        })
     
-    def download_instagram(self, url):
-        """Instagram download using YOUR WORKING RapidAPI"""
+    def remove_query_from_url(self, url):
+        """Remove query parameters from URL"""
+        parsed = urlparse(url)
+        return urlunparse((parsed.scheme, parsed.netloc, parsed.path, '', '', ''))
+    
+    def get_reel_video(self, url):
+        """Extract video URL from Instagram page"""
         try:
-            conn = http.client.HTTPSConnection("instagram-reels-downloader-api.p.rapidapi.com")
-            encoded_url = requests.utils.quote(url, safe='')
+            # Clean URL
+            clean_url = self.remove_query_from_url(url)
             
-            conn.request("GET", f"/download?url={encoded_url}", headers={
-                'x-rapidapi-key': self.rapidapi_key,
-                'x-rapidapi-host': "instagram-reels-downloader-api.p.rapidapi.com"
-            })
+            # Fetch the Instagram page
+            response = self.session.get(clean_url, timeout=30)
             
-            res = conn.getresponse()
-            data = res.read().decode("utf-8")
-            result = json.loads(data)
+            if response.status_code != 200:
+                return None
             
-            print("FULL API RESPONSE:", json.dumps(result, indent=2))
+            html_content = response.text
             
-            if result.get('success') and result.get('data'):
-                data = result['data']
-                
-                # Video URL extract karo
-                video_url = None
-                
-                # Method 1: medias array se video URL lo
-                if data.get('medias') and isinstance(data['medias'], list):
-                    for media in data['medias']:
-                        if media.get('type') == 'video' and media.get('url'):
-                            video_url = media['url']
-                            break
-                
-                # Method 2: Direct URL
-                if not video_url and data.get('url'):
-                    video_url = data['url']
-                
-                if video_url and video_url.startswith('http'):
-                    return {
-                        'success': True,
-                        'platform': 'instagram',
-                        'media_urls': [video_url],
-                        'title': data.get('title', 'Instagram Reel'),
-                        'author': data.get('author', ''),
-                        'thumbnail': data.get('thumbnail', ''),
-                        'post_url': url
-                    }
-                else:
-                    return {'error': 'No video URL found in response'}
-            else:
-                return {'error': result.get('message', 'API request failed')}
-                
+            # Multiple patterns to find video URL
+            video_patterns = [
+                r'"video_url":"([^"]+)"',
+                r'"contentUrl":"([^"]+)"',
+                r'<video[^>]*src="([^"]+)"',
+                r'src="(https://[^"]*\.mp4[^"]*)"',
+                r'video_versions.*?url.*?"([^"]+)"',
+            ]
+            
+            for pattern in video_patterns:
+                matches = re.findall(pattern, html_content)
+                for match in matches:
+                    video_url = match.replace('\\u0026', '&')
+                    if video_url.startswith('http') and '.mp4' in video_url:
+                        return video_url
+            
+            return None
+            
         except Exception as e:
-            return {'error': f'Instagram API error: {str(e)}'}
+            print(f"Error extracting video: {e}")
+            return None
+    
+    def get_reel_info(self, url):
+        """Get reel information including video URL"""
+        try:
+            print(f"[PROCESSING]: {url}")
+            clean_url = self.remove_query_from_url(url)
+            
+            # Get video URL
+            download_link = self.get_reel_video(clean_url)
+            
+            if not download_link:
+                return {'error': 'Could not extract video from Instagram'}
+            
+            # Get basic info from Open Graph (simplified)
+            og_info = self.get_open_graph_info(clean_url)
+            
+            reel_info = {
+                'success': True,
+                'platform': 'instagram',
+                'title': og_info.get('title', 'Instagram Reel'),
+                'description': og_info.get('description', ''),
+                'thumbnail': og_info.get('image', ''),
+                'media_urls': [download_link],
+                'post_url': clean_url
+            }
+            
+            return reel_info
+            
+        except Exception as e:
+            return {'error': f'Instagram processing error: {str(e)}'}
+    
+    def get_open_graph_info(self, url):
+        """Extract Open Graph info from page"""
+        try:
+            response = self.session.get(url, timeout=30)
+            html = response.text
+            
+            og_info = {}
+            
+            # Extract title
+            title_match = re.search(r'<meta[^>]*property="og:title"[^>]*content="([^"]*)"', html)
+            if title_match:
+                og_info['title'] = title_match.group(1)
+            
+            # Extract description
+            desc_match = re.search(r'<meta[^>]*property="og:description"[^>]*content="([^"]*)"', html)
+            if desc_match:
+                og_info['description'] = desc_match.group(1)
+            
+            # Extract image
+            image_match = re.search(r'<meta[^>]*property="og:image"[^>]*content="([^"]*)"', html)
+            if image_match:
+                og_info['image'] = image_match.group(1)
+            
+            return og_info
+            
+        except Exception as e:
+            print(f"Open Graph error: {e}")
+            return {}
     
     def download_tiktok(self, url):
         """TikTok download"""
         try:
-            api_url = "https://tiktok-downloader-download-tiktok-videos-without-watermark.p.rapidapi.com/vid/index"
-            params = {"url": url}
-            headers = {
-                "x-rapidapi-key": self.rapidapi_key,
-                "x-rapidapi-host": "tiktok-downloader-download-tiktok-videos-without-watermark.p.rapidapi.com"
-            }
+            api_url = "https://www.tikwm.com/api/"
+            payload = {"url": url}
             
-            response = requests.get(api_url, params=params, headers=headers, timeout=30)
+            response = self.session.post(api_url, json=payload, timeout=30)
             
             if response.status_code == 200:
                 data = response.json()
-                if data.get('video'):
+                if data.get('data') and data['data'].get('play'):
+                    video_url = data['data']['play']
+                    if not video_url.startswith('http'):
+                        video_url = 'https:' + video_url
+                    
                     return {
                         'success': True,
                         'platform': 'tiktok',
-                        'media_urls': [data['video'][0]],
-                        'title': data.get('title', 'TikTok Video'),
+                        'media_urls': [video_url],
+                        'title': data['data'].get('title', 'TikTok Video'),
                         'post_url': url
                     }
             
@@ -88,17 +151,8 @@ class SocialMediaDownloader:
             
         except Exception as e:
             return {'error': f'TikTok error: {str(e)}'}
-    
-    def download_media(self, url):
-        """Main download function"""
-        if 'instagram.com' in url:
-            return self.download_instagram(url)
-        elif 'tiktok.com' in url:
-            return self.download_tiktok(url)
-        else:
-            return {'error': 'Unsupported platform'}
 
-downloader = SocialMediaDownloader()
+downloader = InstagramDownloader()
 
 @app.route('/')
 def home():
@@ -115,16 +169,23 @@ def download_media():
     if not url:
         return jsonify({'error': 'URL parameter is required'}), 400
     
-    result = downloader.download_media(url)
+    if 'instagram.com' in url:
+        result = downloader.get_reel_info(url)
+    elif 'tiktok.com' in url:
+        result = downloader.download_tiktok(url)
+    else:
+        result = {'error': 'Unsupported platform. Use Instagram or TikTok.'}
+    
     return jsonify(result)
 
 @app.route('/api/status')
 def api_status():
     return jsonify({
         'status': 'active',
-        'service': 'Social Media Downloader',
-        'version': '1.0',
-        'supported_platforms': ['Instagram', 'TikTok']
+        'service': 'Instagram & TikTok Downloader',
+        'version': '2.0',
+        'supported_platforms': ['Instagram', 'TikTok'],
+        'method': 'Direct HTML parsing'
     })
 
 if __name__ == '__main__':
