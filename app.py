@@ -1,193 +1,234 @@
-from flask import Flask, request, jsonify, render_template
-import requests
-import re
+from flask import Flask, request, jsonify, send_file, render_template
+from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import os
-from urllib.parse import urlparse, urlunparse
-import json
+import uuid
+import time
+import threading
+from utils.downloader import download_reel_advanced
+from utils.proxies import get_random_proxy
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+CORS(app)
 
-class InstagramDownloader:
-    def __init__(self):
-        self.session = requests.Session()
-        self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'DNT': '1',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1',
-            'Sec-Fetch-Dest': 'document',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'none',
-            'Cache-Control': 'max-age=0',
-        })
-    
-    def remove_query_from_url(self, url):
-        """Remove query parameters from URL"""
-        parsed = urlparse(url)
-        return urlunparse((parsed.scheme, parsed.netloc, parsed.path, '', '', ''))
-    
-    def get_reel_video(self, url):
-        """Extract video URL from Instagram page"""
-        try:
-            # Clean URL
-            clean_url = self.remove_query_from_url(url)
-            
-            # Fetch the Instagram page
-            response = self.session.get(clean_url, timeout=30)
-            
-            if response.status_code != 200:
-                return None
-            
-            html_content = response.text
-            
-            # Multiple patterns to find video URL
-            video_patterns = [
-                r'"video_url":"([^"]+)"',
-                r'"contentUrl":"([^"]+)"',
-                r'<video[^>]*src="([^"]+)"',
-                r'src="(https://[^"]*\.mp4[^"]*)"',
-                r'video_versions.*?url.*?"([^"]+)"',
-            ]
-            
-            for pattern in video_patterns:
-                matches = re.findall(pattern, html_content)
-                for match in matches:
-                    video_url = match.replace('\\u0026', '&')
-                    if video_url.startswith('http') and '.mp4' in video_url:
-                        return video_url
-            
-            return None
-            
-        except Exception as e:
-            print(f"Error extracting video: {e}")
-            return None
-    
-    def get_reel_info(self, url):
-        """Get reel information including video URL"""
-        try:
-            print(f"[PROCESSING]: {url}")
-            clean_url = self.remove_query_from_url(url)
-            
-            # Get video URL
-            download_link = self.get_reel_video(clean_url)
-            
-            if not download_link:
-                return {'error': 'Could not extract video from Instagram'}
-            
-            # Get basic info from Open Graph (simplified)
-            og_info = self.get_open_graph_info(clean_url)
-            
-            reel_info = {
-                'success': True,
-                'platform': 'instagram',
-                'title': og_info.get('title', 'Instagram Reel'),
-                'description': og_info.get('description', ''),
-                'thumbnail': og_info.get('image', ''),
-                'media_urls': [download_link],
-                'post_url': clean_url
-            }
-            
-            return reel_info
-            
-        except Exception as e:
-            return {'error': f'Instagram processing error: {str(e)}'}
-    
-    def get_open_graph_info(self, url):
-        """Extract Open Graph info from page"""
-        try:
-            response = self.session.get(url, timeout=30)
-            html = response.text
-            
-            og_info = {}
-            
-            # Extract title
-            title_match = re.search(r'<meta[^>]*property="og:title"[^>]*content="([^"]*)"', html)
-            if title_match:
-                og_info['title'] = title_match.group(1)
-            
-            # Extract description
-            desc_match = re.search(r'<meta[^>]*property="og:description"[^>]*content="([^"]*)"', html)
-            if desc_match:
-                og_info['description'] = desc_match.group(1)
-            
-            # Extract image
-            image_match = re.search(r'<meta[^>]*property="og:image"[^>]*content="([^"]*)"', html)
-            if image_match:
-                og_info['image'] = image_match.group(1)
-            
-            return og_info
-            
-        except Exception as e:
-            print(f"Open Graph error: {e}")
-            return {}
-    
-    def download_tiktok(self, url):
-        """TikTok download"""
-        try:
-            api_url = "https://www.tikwm.com/api/"
-            payload = {"url": url}
-            
-            response = self.session.post(api_url, json=payload, timeout=30)
-            
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('data') and data['data'].get('play'):
-                    video_url = data['data']['play']
-                    if not video_url.startswith('http'):
-                        video_url = 'https:' + video_url
-                    
-                    return {
-                        'success': True,
-                        'platform': 'tiktok',
-                        'media_urls': [video_url],
-                        'title': data['data'].get('title', 'TikTok Video'),
-                        'post_url': url
-                    }
-            
-            return {'error': 'TikTok download failed'}
-            
-        except Exception as e:
-            return {'error': f'TikTok error: {str(e)}'}
+# Rate limiting
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["100 per day", "10 per hour"],
+    storage_uri="memory://",
+)
 
-downloader = InstagramDownloader()
+# Configuration
+DOWNLOAD_FOLDER = 'downloads'
+MAX_FILE_AGE = 1800  # 30 minutes
+CLEANUP_INTERVAL = 300  # 5 minutes
+
+if not os.path.exists(DOWNLOAD_FOLDER):
+    os.makedirs(DOWNLOAD_FOLDER)
 
 @app.route('/')
 def home():
     return render_template('index.html')
 
-@app.route('/api/download', methods=['POST', 'GET'])
-def download_media():
-    if request.method == 'GET':
-        url = request.args.get('url')
-    else:
-        data = request.get_json()
-        url = data.get('url') if data else None
-    
-    if not url:
-        return jsonify({'error': 'URL parameter is required'}), 400
-    
-    if 'instagram.com' in url:
-        result = downloader.get_reel_info(url)
-    elif 'tiktok.com' in url:
-        result = downloader.download_tiktok(url)
-    else:
-        result = {'error': 'Unsupported platform. Use Instagram or TikTok.'}
-    
-    return jsonify(result)
-
 @app.route('/api/status')
-def api_status():
+def status():
     return jsonify({
-        'status': 'active',
-        'service': 'Instagram & TikTok Downloader',
-        'version': '2.0',
-        'supported_platforms': ['Instagram', 'TikTok'],
-        'method': 'Direct HTML parsing'
+        "status": "active", 
+        "message": "Reels Downloader API is running",
+        "timestamp": time.time()
     })
 
+@app.route('/api/download', methods=['POST'])
+@limiter.limit("5 per minute")
+def download_reel_endpoint():
+    start_time = time.time()
+    
+    try:
+        # Check content type
+        if not request.is_json:
+            return jsonify({
+                "success": False,
+                "error": "Content-Type must be application/json"
+            }), 400
+        
+        data = request.get_json()
+        
+        if not data or 'url' not in data:
+            return jsonify({
+                "success": False,
+                "error": "URL is required in JSON format"
+            }), 400
+        
+        reel_url = data['url'].strip()
+        
+        if not reel_url:
+            return jsonify({
+                "success": False,
+                "error": "URL cannot be empty"
+            }), 400
+        
+        # Validate URL format
+        if not (reel_url.startswith('http://') or reel_url.startswith('https://')):
+            return jsonify({
+                "success": False,
+                "error": "Invalid URL format. Must start with http:// or https://"
+            }), 400
+        
+        # Check if it's a supported platform
+        supported_domains = [
+            'instagram.com', 'www.instagram.com',
+            'facebook.com', 'www.facebook.com',
+            'fb.watch', 'www.fb.watch'
+        ]
+        
+        if not any(domain in reel_url for domain in supported_domains):
+            return jsonify({
+                "success": False,
+                "error": "Unsupported platform. Supported: Instagram, Facebook"
+            }), 400
+        
+        logger.info(f"Download request for: {reel_url}")
+        
+        # Get proxy if available
+        proxy = get_random_proxy() if data.get('use_proxy', False) else None
+        
+        # Download the reel with advanced method
+        result = download_reel_advanced(reel_url, DOWNLOAD_FOLDER, proxy)
+        
+        processing_time = round(time.time() - start_time, 2)
+        
+        if result['success']:
+            response_data = {
+                "success": True,
+                "message": "Reel downloaded successfully",
+                "download_url": f"/api/file/{result['filename']}",
+                "filename": result['filename'],
+                "file_size": result.get('file_size', 0),
+                "duration": result.get('duration', 'Unknown'),
+                "processing_time": f"{processing_time}s"
+            }
+            
+            # Add preview info if available
+            if result.get('thumbnail'):
+                response_data['thumbnail'] = result['thumbnail']
+            
+            return jsonify(response_data)
+        else:
+            return jsonify({
+                "success": False,
+                "error": result['error'],
+                "processing_time": f"{processing_time}s"
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": f"Internal server error: {str(e)}"
+        }), 500
+
+@app.route('/api/file/<filename>')
+def serve_file(filename):
+    try:
+        # Security checks
+        if '..' in filename or '/' in filename:
+            return jsonify({"error": "Invalid filename"}), 400
+        
+        file_path = os.path.join(DOWNLOAD_FOLDER, filename)
+        
+        if not os.path.exists(file_path):
+            return jsonify({"error": "File not found or expired"}), 404
+        
+        # Check file age
+        file_age = time.time() - os.path.getctime(file_path)
+        if file_age > MAX_FILE_AGE:
+            os.remove(file_path)
+            return jsonify({"error": "File expired"}), 410
+            
+        return send_file(file_path, as_attachment=True, download_name=f"reel_{filename}")
+        
+    except Exception as e:
+        logger.error(f"File serving error: {str(e)}")
+        return jsonify({"error": "Error serving file"}), 500
+
+@app.route('/api/cleanup', methods=['POST'])
+def cleanup_files():
+    """Manual cleanup endpoint"""
+    try:
+        deleted_files = cleanup_old_files()
+        return jsonify({
+            "success": True,
+            "message": f"Cleanup completed. Deleted {deleted_files} files."
+        })
+    except Exception as e:
+        return jsonify({"error": f"Cleanup failed: {str(e)}"}), 500
+
+def cleanup_old_files():
+    """Clean up old files"""
+    try:
+        deleted_count = 0
+        current_time = time.time()
+        
+        for filename in os.listdir(DOWNLOAD_FOLDER):
+            file_path = os.path.join(DOWNLOAD_FOLDER, filename)
+            if os.path.isfile(file_path):
+                file_age = current_time - os.path.getctime(file_path)
+                if file_age > MAX_FILE_AGE:
+                    os.remove(file_path)
+                    deleted_count += 1
+                    logger.info(f"Deleted old file: {filename}")
+        
+        return deleted_count
+    except Exception as e:
+        logger.error(f"Cleanup error: {str(e)}")
+        return 0
+
+def background_cleanup():
+    """Background cleanup thread"""
+    while True:
+        time.sleep(CLEANUP_INTERVAL)
+        try:
+            deleted = cleanup_old_files()
+            if deleted > 0:
+                logger.info(f"Background cleanup deleted {deleted} files")
+        except Exception as e:
+            logger.error(f"Background cleanup error: {str(e)}")
+
+# Start background cleanup thread
+cleanup_thread = threading.Thread(target=background_cleanup, daemon=True)
+cleanup_thread.start()
+
+# Error handlers
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    return jsonify({
+        "success": False,
+        "error": "Rate limit exceeded. Please try again later."
+    }), 429
+
+@app.errorhandler(404)
+def not_found_handler(e):
+    return jsonify({
+        "success": False,
+        "error": "Endpoint not found"
+    }), 404
+
+@app.errorhandler(500)
+def internal_error_handler(e):
+    return jsonify({
+        "success": False,
+        "error": "Internal server error"
+    }), 500
+
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    logger.info("Starting Reels Downloader API...")
+    # Initial cleanup
+    cleanup_old_files()
+    app.run(host='0.0.0.0', port=5000, debug=False)
